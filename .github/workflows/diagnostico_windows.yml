@@ -1,0 +1,45 @@
+# Diagnostico temporal: comportamiento del runner de Windows con un repositorio cuyo nombre termina en punto.
+name: Diagnostico Windows
+on:
+  push:
+    branches: [claude/dazzling-davinci-aqwk5k]
+    paths: [.github/workflows/diagnostico_windows.yml]
+  workflow_dispatch:
+jobs:
+  diag:
+    runs-on: windows-latest
+    steps:
+      - name: cwd por defecto
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Write-Host "PWD=$PWD WS=$env:GITHUB_WORKSPACE"
+          Get-ChildItem D:\a -Force | ForEach-Object { $_.FullName }
+          cmd /c "dir /x D:\a"
+      - name: cwd explicito
+        continue-on-error: true
+        shell: pwsh
+        working-directory: C:\
+        run: |
+          Write-Host "PWD=$PWD"
+          Get-ChildItem D:\a -Force -Recurse -Depth 1 | ForEach-Object { $_.FullName }
+          Get-ChildItem C:\hostedtoolcache\windows\Python | ForEach-Object { $_.Name }
+          where.exe python; where.exe py; where.exe gh; where.exe git; where.exe choco
+          python --version
+          Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+      - name: setup-python
+        continue-on-error: true
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: archivo de prueba
+        continue-on-error: true
+        shell: pwsh
+        working-directory: C:\
+        run: New-Item -ItemType Directory -Force C:\mu\dist | Out-Null; Set-Content C:\mu\dist\x.txt hola
+      - name: upload-artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag
+          path: C:\mu\dist\x.txt
