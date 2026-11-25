@@ -74,3 +74,15 @@ Detalle y clasificación (error / limitación / representación / convención) e
 |---|---|---|---|---|
 | H-1 | `evaluate "1e999999999"` colgaba el proceso e ignoraba `timeout_ms`; `1e100000` → `internal_error` | El parser aceptaba exponentes decimales sin cota y calculaba `10**exp` antes de cualquier límite | `parser._to_fraction`: exponente |e| ≤ 1000 (`MAX_EXP10`), si no `LIMIT_EXCEEDED` | `test_21_integracion_matrices.py::test_h1_*` |
 | F10-1 | Pruebas de aislamiento 9A recorrían `.venv` (falsos positivos en Windows) | Alcance demasiado amplio | Ya corregido en 9B; en esta fase `tests/linalg` usa `recorrer()` que excluye entornos virtuales | `test_31_windows_lint.py::test_el_alcance_excluye_entornos_virtuales` |
+
+## Versión 0.5.0 (compilación real en GitHub Actions)
+| ID | Hallazgo | Causa | Corrección | Prueba de regresión |
+|---|---|---|---|---|
+| CI-1 | Windows: `Directory 'D:\a\math-universe.\math-universe.' does not exist` (run 45532010131) | El repositorio se llama `math-universe.`; Windows quita el punto final de la carpeta y `actions/checkout` busca la ruta con punto | Código obtenido con `git fetch` del commit exacto (ADR-5) | `test_22::test_windows_no_usa_actions_checkout` |
+| CI-2 | `test_08`: `(x^3-8)/(x-2)` → `DIFERENCIA_DOMINIO` con SymPy 1.14 (run 45532010131) | Comparador: `sp.N` de un `0/0` sin evaluar daba `0.e+6`; además ignoraba que el motor declara `x ≠ 2`. El motor era correcto | `comparar_sympy.indefinida_en` evalúa con `.doit()`; los puntos excluidos por el motor y confirmados de forma independiente no son diferencia | `test_08_sympy.py` (corpus completo y caso dedicado) |
+| CI-3 | Windows: 36 archivos «modificados» respecto de la fase 8 (run 45540039639) | `git` de Windows convertía LF→CRLF (`core.autocrlf`) en el checkout manual | `core.autocrlf false` y `.gitattributes` (`* -text`) | `test_20_conservacion_fase8.py` |
+| CI-4 | Windows/Python 3.12: `test_servidor_jsonlines` veía `x â‰  1` (run 45540039639) | La **prueba** decodificaba la salida UTF-8 con cp1252; el servidor y el cliente Dart usan UTF-8 | La prueba decodifica UTF-8 explícitamente | `test_06::test_servidor_jsonlines_una_respuesta_por_linea` |
+| CI-5 | Android: `Python 3.12 is not available for the ABI 'armeabi-v7a'` (run 45540039639) | Flutter 3.50 reemplaza `abiFilters` por sus 3 ABIs | `disable-abi-filtering=true` en `gradle.properties` (ADR-6) | `test_22::test_parche_android_y_es_idempotente` |
+| F-1 | Instalador Windows sin SymPy ni mpmath (solo jsonschema) | `package_windows.ps1` de la fase 10 | SymPy 1.14.0 y mpmath 1.3.0 en el Python embebido; el empaquetado prueba SymPy y mpmath | `package_windows.ps1` (pasos 5) y autoprueba instalada |
+| F-2 | APK sin SymPy ni mpmath | `patch_android.py` de la fase 10 no instalaba paquetes | `pip install` en el bloque `chaquopy` | `test_22` + comprobación del contenido del APK en CI |
+| F-3 | `precision > 15` para π, e, ln… daba 15 cifras | mpmath no integrado | `numeric_mp.py` con contraste independiente (ADR-10) | `test_23_precision_mpmath.py` |
