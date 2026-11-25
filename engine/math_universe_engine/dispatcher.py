@@ -6,6 +6,7 @@ import re
 import time
 from fractions import Fraction
 from . import __version__, symbolic, limits, calculus, numeric_mp, solve as S
+from . import advanced, plot as P, presentation, steps as STEPS, interpret as NL
 from .arith import evaluate as arith_eval, format_fraction, to_decimal
 from .ast_tools import normalize, to_str, free_symbols, eval_float, eval_q, const_value
 from .errors import *
@@ -15,7 +16,7 @@ from .qsqrt import Q, q_to_decimal
 from .rational import Ctx, to_rf, rf_str, condition_list
 from .verify import equivalent
 
-API_VERSION = "1.1"
+API_VERSION = "1.2"
 _SCHEMA_DIR = os.path.join(os.path.dirname(__file__), "..", "schema")
 try:
     import jsonschema
@@ -82,8 +83,15 @@ def capabilities():
                 "limites": "experimental (series de Laurent; sin infinitos de funciones trascendentes)",
                 "verificacion_independiente": "estable (por operacion)",
                 "respaldo_sympy": "experimental (resultado verificado de forma independiente)" if sym else "no_disponible_en_este_entorno",
-                "matrices_algebra_lineal": "estable (entradas racionales exactas, hasta 40x40: suma, resta, producto, transpuesta, determinante, inversa, rango, rref, sistemas; cada resultado con verificacion independiente)", "determinant": "alias de matrix_det", "autovalores": "planificada", "estadistica": "planificada",
-                "ingenieria_electrica": "planificada"}}
+                "matrices_algebra_lineal": "estable (entradas racionales exactas, hasta 40x40: suma, resta, producto, transpuesta, determinante, inversa, rango, rref, sistemas; cada resultado con verificacion independiente)", "determinant": "alias de matrix_det",                 "ingenieria_electrica": "biblioteca de formulas (Ohm, potencias, reactancias, resonancia, trifasica, transformador...) con verificacion por sustitucion",
+                "autovalores_y_autovectores": "estable (hasta 6x6, exactos, verificados A·v = λ·v)",
+                "calculo_multivariable": "derivadas parciales, gradiente, Hessiano, Jacobiano (verificados con diferencias finitas)",
+                "series_de_taylor": "estable (verificacion del orden del error)", "inecuaciones": "una variable real",
+                "numeros_complejos": "binomica, polar, modulo, argumento, conjugado", "ecuaciones_diferenciales": "EDO con SymPy dsolve, verificadas por sustitucion",
+                "transformada_de_laplace": "directa e inversa, verificadas por cuadratura numerica",
+                "estadistica_descriptiva": "exacta, verificada con el modulo statistics", "unidades": "SI y analisis dimensional",
+                "graficas": "2D, parametricas, polares y superficies (muestreo del motor)", "paso_a_paso": "ecuaciones de grado 1 y 2, derivadas, Gauss-Jordan",
+                "lenguaje_natural": "instrucciones en espanol por reglas (siempre con confirmacion)"}}
 
 
 def _validate(req):
@@ -561,6 +569,18 @@ def _dispatch(req, st):
     if op == "capabilities": return {"data": capabilities()}
     if op == "determinant" or op in MATRIX_OPS:
         return op_matrix(req, st)
+    if op == "formulas": return {"data": {"formulas": advanced.formulas_catalog()}}
+    if op == "interpret": return {"data": NL.interpret(req.get("expression") or "")}
+    if op in advanced.ADVANCED_OPS:
+        remaining = max(0.5, limits._deadline - time.perf_counter()) if limits._deadline else 30
+        out = limits.run_in_thread(advanced.run, (req, st), remaining)
+        st.conditions.extend(out.pop("conditions_extra", []) or [])
+        return out
+    if op in ("plot", "plot3d", "parametric", "polar"):
+        if not req.get("expression"): raise InvalidRequest("Falta 'expression'")
+        if op == "plot": return P.op_plot(req, st)
+        if op == "plot3d": return P.op_plot3d(req, st)
+        return P.op_parametric(req, st, polar=(op == "polar"))
     if not req.get("expression"): raise InvalidRequest("Falta 'expression'")
     fn = OPS.get(op)
     if fn is None: raise NotImplementedOperation(f"Operación '{op}' no implementada")
@@ -638,6 +658,8 @@ def handle(req):
         resp["conditions"] = list(dict.fromkeys(_norm_cond(c) for c in st.conditions))
         resp["warnings"] = list(dict.fromkeys(st.warnings + out.pop("warnings", [])))
         resp.update(out)
+        if resp.get("status") in _CON_RESULTADO:
+            _presentacion(req, resp)
     except EngineError as e:
         resp["status"] = STATUS_BY_CODE.get(e.code, "internal_error")
         resp["error"] = {"code": e.code, "message": e.message, "details": _jsonable(e.details)}
@@ -654,6 +676,73 @@ def handle(req):
         limits.stop()
     resp["elapsed_ms"] = round((time.perf_counter() - t0) * 1000, 3)
     return _apply_validity(resp)
+
+
+_CON_RESULTADO = {"success_exact", "success_approximate", "multiple_solutions", "no_solution"}
+_SIN_LATEX_DE_ENTRADA = {"units", "stats", "formula", "formulas", "interpret", "ode", "inequality", "plot", "plot3d",
+                         "parametric", "polar", "capabilities", "ping"}
+
+
+def _presentacion(req, resp):
+    """LaTeX y pasos opcionales (req.latex / req.steps). Nunca altera el resultado ni puede hacer fallar la respuesta."""
+    op = req["operation"]
+    if req.get("latex"):
+        try:
+            lat = resp.get("latex") or {}
+            if op not in _SIN_LATEX_DE_ENTRADA and req.get("expression") and "input" not in lat:
+                lat["input"] = presentation.latex_of(req["expression"])
+            if "result" not in lat and resp.get("exact_result"):
+                lat["result"] = presentation.latex_of(resp["exact_result"])
+            resp["latex"] = lat
+        except Exception:
+            pass
+    if req.get("steps"):
+        try:
+            st_ = None
+            if op == "solve":
+                sols = [s_["value"] for s_ in (resp.get("data") or {}).get("solutions", [])] if resp["status"] == "success_exact" else []
+                if sols or resp["status"] == "no_solution":
+                    st_ = STEPS.solve_steps(req["expression"], req.get("variables"), sols)
+            elif op == "differentiate" and resp.get("exact_result") and (req.get("order") or 1) == 1:
+                st_ = STEPS.derivative_steps(req["expression"], req.get("variables"), resp["exact_result"])
+            elif op in ("matrix_inverse", "matrix_solve") and resp["status"] in ("success_exact", "multiple_solutions", "no_solution"):
+                st_ = _gauss(req, resp)
+            if st_: resp["steps"] = st_
+        except Exception:
+            pass
+
+
+def _gauss(req, resp):
+    from fractions import Fraction
+    from math_universe_linalg import api as LA
+    a, b = _matrix_inputs(req)
+    A = LA_parse(a)
+    n = len(A)
+    if req["operation"] == "matrix_inverse":
+        B = [[Fraction(int(i == j)) for j in range(n)] for i in range(n)]
+    else:
+        B = LA_parse(b)
+    pasos, M = STEPS.gauss_steps(A, B)
+    m = len(A[0])
+    if req["operation"] == "matrix_inverse":
+        inv = [[str(v) for v in row[m:]] for row in M]
+        esperado = (resp.get("data") or {}).get("matrix")
+        if esperado is None or [[str(Fraction(x)) for x in r] for r in esperado] != inv: return None
+    elif (resp.get("data") or {}).get("kind") == "unique":
+        x = [str(row[m]) for row in M[:m]]
+        if [str(Fraction(v)) for v in resp["data"]["particular"]] != x: return None
+    return pasos
+
+
+def LA_parse(a):
+    """Matriz del contrato (lista o texto) → filas de Fraction, con el mismo parser exacto del motor."""
+    from fractions import Fraction
+    from .arith import evaluate as _ev
+    if isinstance(a, str):
+        rows = re.findall(r"\[([^\[\]]+)\]", a)
+        a = [[c.strip() for c in r.split(",")] for r in rows]
+    return [[Fraction(_ev(_text_ast(str(c)))) if not isinstance(c, (int, float)) else Fraction(str(c)) for c in row]
+            if isinstance(row, list) else [Fraction(_ev(_text_ast(str(row))))] for row in a]
 
 
 def _jsonable(x):

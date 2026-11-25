@@ -62,6 +62,7 @@ def run_in_thread(func, args, timeout_s):
             box["ok"] = func(*args)
         except BaseException as e:  # se informa igual que desde el proceso hijo
             box["err"] = repr(e)
+            box["exc"] = e
 
     t = threading.Thread(target=run, name="mu_sympy", daemon=True)
     t.start()
@@ -69,6 +70,8 @@ def run_in_thread(func, args, timeout_s):
     if t.is_alive():
         raise TimeoutExceeded("Se agotó el tiempo de cálculo permitido (el cálculo se descartó)")
     if "err" in box:
+        from .errors import EngineError
+        if isinstance(box.get("exc"), EngineError): raise box["exc"]   # errores del contrato: se conservan tal cual
         raise RuntimeError(box["err"])
     return box["ok"]
 

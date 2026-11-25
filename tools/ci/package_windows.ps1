@@ -51,7 +51,9 @@ $reqs = @(
  '{"operation":"simplify","request_id":4,"expression":"(x^3-8)/(x-2)"}',
  '{"operation":"evaluate","request_id":5,"expression":"1e999999999","timeout_ms":2000}',
  '{"operation":"integrate","request_id":6,"expression":"sin(x)^2","timeout_ms":60000}',
- '{"operation":"evaluate","request_id":7,"expression":"pi","precision":40}'
+ '{"operation":"evaluate","request_id":7,"expression":"pi","precision":40}',
+ '{"operation":"eigen","request_id":8,"structured_input":{"a":[[2,1],[1,2]]},"latex":true}',
+ '{"operation":"plot","request_id":9,"expression":"1/x","params":{"xmin":-2,"xmax":2,"samples":101}}'
 )
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
@@ -63,11 +65,13 @@ $r = $lines | ForEach-Object { $_ | ConvertFrom-Json }
 if ($r[0].status -ne "success_exact") { throw "ping fallo" }
 if ($r[1].exact_result -ne "-2" -or $r[1].verification.status -ne "passed") { throw "determinante fallo" }
 if ($r[2].exact_result -ne "[[1, -1], [-1, 2]]") { throw "inversa fallo: $($r[2].exact_result)" }
-if ($r[3].api_version -ne "1.1" -or ($r[3].conditions -notcontains "x $([char]0x2260) 2")) { throw "dominio x != 2 perdido: $($lines[3])" }
+if ($r[3].api_version -ne "1.2" -or ($r[3].conditions -notcontains "x $([char]0x2260) 2")) { throw "dominio x != 2 perdido: $($lines[3])" }
 if ($r[4].status -ne "invalid_input") { throw "H-1: el literal gigante no fue rechazado" }
 if ($r[5].method -ne "sympy_respaldo_experimental" -or $r[5].verification.status -ne "passed") { throw "SymPy no funciona en el motor empaquetado: $($lines[5])" }
 if ($r[6].approximate_result -ne "3.141592653589793238462643383279502884197") { throw "mpmath no funciona en el motor empaquetado: $($lines[6])" }
-Write-Host "Motor empaquetado: $($reqs.Count)/$($reqs.Count) respuestas correctas (incluye SymPy y mpmath)"
+if ($r[7].verification.status -ne "passed" -or -not $r[7].latex.result) { throw "autovalores/LaTeX fallan en el motor empaquetado: $($lines[7])" }
+if (@($r[8].data.series[0].segments).Count -ne 2) { throw "la grafica de 1/x no corta la asintota: $($lines[8])" }
+Write-Host "Motor empaquetado: $($reqs.Count)/$($reqs.Count) respuestas correctas (incluye SymPy, mpmath, autovalores, LaTeX y graficas)"
 
 # 6) instalador (Inno Setup) y version portable
 $dist = Join-Path $Root "dist"

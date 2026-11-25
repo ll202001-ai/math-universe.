@@ -1,6 +1,6 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
- "title": "MathUniverseResponse v1 (Adenda rectora §7)",
+ "title": "MathUniverseResponse v1.2",
  "type": "object",
  "required": [
   "request_id",
@@ -124,6 +124,43 @@
   },
   "elapsed_ms": {
    "type": "number"
+  },
+  "latex": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "result": {
+     "type": [
+      "string",
+      "null"
+     ]
+    }
+   }
+  },
+  "steps": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "text"
+    ],
+    "properties": {
+     "text": {
+      "type": "string"
+     },
+     "latex": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   }
   }
  }
 }
