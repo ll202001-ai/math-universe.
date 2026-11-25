@@ -24,8 +24,18 @@ except ImportError:  # pragma: no cover
 
 
 def _load(name):
-    with open(os.path.join(_SCHEMA_DIR, name), encoding="utf-8") as f:
-        return json.load(f)
+    """Esquema del contrato. Windows/Linux: archivo en engine/schema. Android (Chaquopy): el código se importa desde un
+    ZIP dentro del APK y no hay carpeta en disco; patch_android.py copia los esquemas a math_universe_engine/_schema y
+    se leen con pkgutil.get_data, que funciona con cualquier importador (CI 2026-11-25: FileNotFoundError en el APK)."""
+    try:
+        with open(os.path.join(_SCHEMA_DIR, name), encoding="utf-8") as f:
+            return json.load(f)
+    except OSError:
+        import pkgutil
+        data = pkgutil.get_data(__package__, "_schema/" + name)
+        if data is None:
+            raise
+        return json.loads(data.decode("utf-8"))
 
 
 REQUEST_SCHEMA = _load("request.schema.json")

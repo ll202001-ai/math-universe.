@@ -78,6 +78,34 @@ def test_puente_android_funciona_con_el_motor_copiado_y_sin_jsonschema(tmp_path)
     assert d["status"] == "internal_error"
 
 
+def test_puente_android_funciona_importando_el_motor_desde_un_zip_sin_carpeta_schema(tmp_path):
+    """Como en el APK (Chaquopy): el código se importa desde un ZIP y no hay archivos en disco. Reproduce el
+    FileNotFoundError visto en el emulador (CI 2026-11-25) y comprueba la corrección."""
+    import zipfile
+    app = _proyecto(tmp_path, True)
+    subprocess.run([sys.executable, PATCH, str(app), ENGINE], check=True, capture_output=True, timeout=60)
+    py = app / "android" / "app" / "src" / "main" / "python"
+    z = tmp_path / "app.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        for f in py.rglob("*"):
+            rel = f.relative_to(py).as_posix()
+            if f.is_file() and not rel.startswith("schema/") and "__pycache__" not in rel:
+                zf.write(f, rel)
+    code = ("import sys, json; sys.path.insert(0, %r)\n"
+            "import mu_bridge\n"
+            "print(json.dumps([json.loads(mu_bridge.handle(json.dumps(r))) for r in (\n"
+            "  {'operation': 'ping', 'request_id': 1},\n"
+            "  {'operation': 'evaluate', 'request_id': 2, 'expression': '1+1'},\n"
+            "  {'operation': 'capabilities', 'request_id': 3})]))\n") % str(z)
+    r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, encoding="utf-8", timeout=120,
+                       cwd=str(tmp_path))
+    assert r.returncode == 0, r.stderr
+    a, b, c = json.loads(r.stdout)
+    assert a["status"] == "success_exact", a
+    assert b["exact_result"] == "2", b
+    assert c["status"] == "success_exact" and c["data"]["engine_version"] == "0.5.0", c
+
+
 def _workflow():
     with open(os.path.join(RAIZ, ".github", "workflows", "construir.yml"), encoding="utf-8") as f: return f.read()
 

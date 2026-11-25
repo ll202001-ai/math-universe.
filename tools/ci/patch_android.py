@@ -28,6 +28,9 @@ def main(app, engine):
     for d in ("math_universe_engine", "math_universe_linalg", "schema"):
         shutil.copytree(os.path.join(engine, d), os.path.join(py_dst, d), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     shutil.copy(os.path.join(app, "android_bridge", "mu_bridge.py"), py_dst)
+    # Chaquopy importa el codigo desde un ZIP del APK: la carpeta schema/ de nivel superior no existe en disco.
+    # Copia dentro del paquete para pkgutil.get_data (ver dispatcher._load).
+    shutil.copytree(os.path.join(engine, "schema"), os.path.join(py_dst, "math_universe_engine", "_schema"))
 
     kt_dir = os.path.join(android, "app", "src", "main", "kotlin", "com", "mathuniverse", "math_universe_app")
     os.makedirs(kt_dir, exist_ok=True)
