@@ -37,6 +37,8 @@ def test_parche_android_y_es_idempotente(tmp_path, kts):
     assert b.index("com.android.application") < b.index("com.chaquo.python")         # Chaquopy despues del plugin de Android
     assert "sympy==1.14.0" in b and "mpmath==1.3.0" in b, "SymPy y mpmath deben empaquetarse dentro del APK"
     assert "24" in b.split("minSdk")[1].split("\n")[0], "Chaquopy exige minSdk >= 24"
+    g = (app / "android" / "gradle.properties").read_text(encoding="utf-8")
+    assert g.count("disable-abi-filtering=true") == 1, "Flutter no debe reponer armeabi-v7a (sin Python 3.12 en Chaquopy)"
     py = app / "android" / "app" / "src" / "main" / "python"
     assert {"math_universe_engine", "math_universe_linalg", "schema", "mu_bridge.py"} <= set(os.listdir(py))
     assert (app / "android" / "app" / "src" / "main" / "kotlin" / "com" / "mathuniverse" / "math_universe_app" / "MainActivity.kt").exists()

@@ -70,6 +70,13 @@ def main(app, engine):
             pip = "".join(f'            install "{p}"\n' for p in PIP)
             b += (f'\nchaquopy {{\n    defaultConfig {{\n        version "{PYVER}"\n        pip {{\n{pip}        }}\n    }}\n}}\n')
         escribir(bp, b)
+    # --- gradle.properties: Flutter 3.50 reemplaza defaultConfig.ndk.abiFilters por [armeabi-v7a, arm64-v8a, x86_64]
+    # (FlutterPlugin.configureAbiWithoutSplits) salvo con disable-abi-filtering=true. Chaquopy no tiene Python 3.12 para
+    # armeabi-v7a (32 bits): sin esta propiedad la compilacion falla (CI 2026-11-25, run 45540039639).
+    gp = os.path.join(android, "gradle.properties")
+    g = leer(gp) if os.path.exists(gp) else ""
+    if "disable-abi-filtering" not in g:
+        escribir(gp, g.rstrip("\n") + ("\n" if g else "") + "# MATH UNIVERSE: las ABIs las fija app/build.gradle (Chaquopy: arm64-v8a y x86_64)\ndisable-abi-filtering=true\n")
     print("Android preparado: motor Python (Chaquopy %s, Python %s, %s) integrado." % (CHAQUOPY, PYVER, ", ".join(PIP)))
 
 
