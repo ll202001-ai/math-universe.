@@ -1,0 +1,31 @@
+{
+ "request": {
+  "operation": "matrix_sub",
+  "structured_input": {
+   "a": "[[1/2,1/3],[1/4,1/5]]",
+   "b": "[[1/2,0],[0,1/5]]"
+  }
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "[[0, 1/3], [1/4, 0]]",
+  "data": {
+   "matrix": [
+    [
+     "0",
+     "1/3"
+    ],
+    [
+     "1/4",
+     "0"
+    ]
+   ]
+  },
+  "verification": {
+   "status": "passed",
+   "method": "(A−B)+B = A elemento a elemento"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "request": {
+  "operation": "matrix_det",
+  "structured_input": {
+   "a": [
+    [
+     "x",
+     1
+    ],
+    [
+     2,
+     3
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "invalid_input",
+  "verification": {
+   "status": "not_performed",
+   "method": null
+  },
+  "error": {
+   "code": "PARSE_ERROR"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

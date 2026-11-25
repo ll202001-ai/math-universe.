@@ -1,0 +1,52 @@
+{
+ "request": {
+  "operation": "matrix_solve",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   "b": [
+    [
+     2
+    ],
+    [
+     2
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "multiple_solutions",
+  "exact_result": "x = [2, 0] + t1·[-1, 1]",
+  "data": {
+   "kind": "infinite",
+   "rank": 1,
+   "particular": [
+    "2",
+    "0"
+   ],
+   "nullspace_basis": [
+    [
+     "-1",
+     "1"
+    ]
+   ],
+   "free_columns": [
+    1
+   ]
+  },
+  "verification": {
+   "status": "passed",
+   "method": "A·x_p = b y A·v = 0 para cada vector de la base del núcleo (exacto)"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "request": {
+  "operation": "determinant",
+  "expression": "[[1,2],[3,4]]"
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "-2",
+  "data": {
+   "determinant": "-2",
+   "invertible": true
+  },
+  "verification": {
+   "status": "passed",
+   "method": "Bareiss + Laplace + det(Aᵀ) = det(A)"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

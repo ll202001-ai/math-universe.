@@ -1,0 +1,176 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "MathUniverseRequest v1.1 (Adenda rectora §7 + álgebra lineal)",
+ "type": "object",
+ "required": [
+  "operation"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "request_id": {
+   "type": [
+    "string",
+    "integer",
+    "null"
+   ]
+  },
+  "operation": {
+   "type": "string",
+   "enum": [
+    "ping",
+    "capabilities",
+    "parse",
+    "evaluate",
+    "simplify",
+    "expand",
+    "factor",
+    "solve",
+    "differentiate",
+    "integrate",
+    "limit",
+    "determinant",
+    "matrix_add",
+    "matrix_sub",
+    "matrix_mul",
+    "matrix_transpose",
+    "matrix_det",
+    "matrix_inverse",
+    "matrix_rank",
+    "matrix_rref",
+    "matrix_solve"
+   ]
+  },
+  "expression": {
+   "type": "string",
+   "maxLength": 5000
+  },
+  "structured_input": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "a": {
+     "oneOf": [
+      {
+       "type": "string",
+       "maxLength": 20000
+      },
+      {
+       "type": "array",
+       "maxItems": 40,
+       "items": {
+        "oneOf": [
+         {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+           "type": [
+            "string",
+            "number"
+           ]
+          }
+         },
+         {
+          "type": [
+           "string",
+           "number"
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "b": {
+     "oneOf": [
+      {
+       "type": "string",
+       "maxLength": 20000
+      },
+      {
+       "type": "array",
+       "maxItems": 40,
+       "items": {
+        "oneOf": [
+         {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+           "type": [
+            "string",
+            "number"
+           ]
+          }
+         },
+         {
+          "type": [
+           "string",
+           "number"
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  },
+  "variables": {
+   "type": "array",
+   "items": {
+    "type": "string",
+    "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"
+   },
+   "maxItems": 20
+  },
+  "assumptions": {
+   "type": "object",
+   "additionalProperties": {
+    "enum": [
+     "real",
+     "positive",
+     "negative",
+     "nonzero",
+     "integer",
+     "complex"
+    ]
+   }
+  },
+  "precision": {
+   "type": "integer",
+   "minimum": 1,
+   "maximum": 1000
+  },
+  "timeout_ms": {
+   "type": "integer",
+   "minimum": 1,
+   "maximum": 600000
+  },
+  "engine_version": {
+   "type": "string"
+  },
+  "point": {
+   "type": "string",
+   "maxLength": 50
+  },
+  "direction": {
+   "enum": [
+    "both",
+    "+",
+    "-"
+   ]
+  },
+  "lower": {
+   "type": "string",
+   "maxLength": 50
+  },
+  "upper": {
+   "type": "string",
+   "maxLength": 50
+  },
+  "order": {
+   "type": "integer",
+   "minimum": 1,
+   "maximum": 20
+  }
+ }
+}

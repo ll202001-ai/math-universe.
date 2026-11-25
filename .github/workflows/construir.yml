@@ -1,103 +1,231 @@
-# MATH UNIVERSE - compilacion automatica desde el ZIP subido al repositorio (Windows + Android).
-# Ruta de este archivo en el repositorio:  .github/workflows/construir.yml
-# El repositorio solo necesita: este archivo y el ZIP  MATH_UNIVERSE_fase10.zip  en la raiz.
+# MATH UNIVERSE: pruebas, compilacion, verificacion de la instalacion sin red y publicacion (Windows + Android).
+# El codigo fuente esta en el repositorio (app/, engine/, installer/, tools/). Nada se omite: cualquier fallo detiene
+# el trabajo en rojo y no se publica nada sin verificar.
 name: Construir MATH UNIVERSE (Windows y Android)
 on:
   push:
   workflow_dispatch:
 
+env:
+  FLUTTER_VERSION: "3.50.1"
+  PYTHON_VERSION: "3.12"
+  MOTOR_DEPS: "pytest jsonschema numpy scipy sympy==1.14.0 mpmath==1.3.0"
+
+concurrency:
+  group: construir-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 75
-    steps:
-      - uses: actions/checkout@v4
-      - name: Descomprimir el ZIP
+    timeout-minutes: 90
+    defaults:
+      run:
         shell: pwsh
+    steps:
+      # El nombre del repositorio termina en punto ("math-universe."). Windows elimina el punto final de las carpetas,
+      # el runner crea D:\a\math-universe\math-universe y actions/checkout falla al buscar la ruta con punto.
+      # Se descarga el commit con git directamente en la carpeta de trabajo real (comprobado en un diagnostico previo).
+      - name: Obtener el codigo (git directo; ver comentario)
         run: |
-          Expand-Archive -Path MATH_UNIVERSE_fase10.zip -DestinationPath work -Force
-          Get-ChildItem work/MATH_UNIVERSE | Select-Object -First 20 | ForEach-Object Name
+          git init -q .
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ github.token }}"))
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch -q --depth 1 origin ${{ github.sha }}
+          git checkout -q FETCH_HEAD
+          $root = (Get-Location).ProviderPath
+          "MU_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Codigo en $root ($(git rev-parse --short HEAD))"
+          Get-ChildItem | ForEach-Object Name
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Motor - pruebas completas (con SymPy y NumPy reales)
-        shell: pwsh
-        working-directory: work/MATH_UNIVERSE/engine
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Motor - pruebas completas (SymPy y mpmath reales)
+        working-directory: engine
         run: |
-          python -m pip install --quiet pytest jsonschema numpy scipy sympy mpmath
+          python -m pip install --quiet $env:MOTOR_DEPS.Split(' ')
           python -m pytest tests -q -p no:cacheprovider -rs
+
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: Flutter - andamiaje, analisis y pruebas (incluye prueba real cliente Dart <-> motor Python)
-        shell: pwsh
-        working-directory: work/MATH_UNIVERSE/app
-        env:
-          MATH_UNIVERSE_ENGINE_DIR: ${{ github.workspace }}\work\MATH_UNIVERSE\engine
+
+      - name: Flutter - dependencias y analisis estatico
+        working-directory: app
         run: |
-          flutter create --platforms=windows,android --org com.mathuniverse --project-name math_universe_app .
+          flutter --version
           flutter pub get
           flutter analyze --no-fatal-infos
+
+      - name: Flutter - pruebas (incluye cliente Dart <-> motor Python real y la autoprueba con SQLite real)
+        working-directory: app
+        run: |
+          $env:MATH_UNIVERSE_ENGINE_DIR = Join-Path $env:MU_ROOT "engine"
           flutter test --reporter expanded
+
       - name: Flutter - compilar Windows (release)
-        shell: pwsh
-        working-directory: work/MATH_UNIVERSE/app
+        working-directory: app
         run: flutter build windows --release
-      - name: Empaquetar (Python embebido + motor), probar el motor empaquetado y crear instalador
-        shell: pwsh
-        working-directory: work/MATH_UNIVERSE
+
+      - name: Empaquetar (Python embebido + SymPy + mpmath + motor + VC++), probar el motor empaquetado y crear el instalador
         run: ./tools/ci/package_windows.ps1
+
+      - name: Instalar el .exe y verificar la app instalada SIN RED (firewall) con su autoprueba
+        run: ./tools/ci/verify_windows_install.ps1
+
+      - name: Huellas SHA-256
+        run: |
+          Get-ChildItem dist -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content dist\SHA256_WINDOWS.txt
+          Get-Content dist\SHA256_WINDOWS.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: MATH_UNIVERSE_Windows
-          path: work/MATH_UNIVERSE/dist/*
+          path: ${{ env.MU_ROOT }}\dist\*
+          if-no-files-found: error
 
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - name: Descomprimir el ZIP
-        run: unzip -q MATH_UNIVERSE_fase10.zip -d work
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Motor - pruebas (Linux)
-        working-directory: work/MATH_UNIVERSE/engine
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Motor - pruebas completas (Linux)
+        working-directory: engine
         run: |
-          python -m pip install --quiet pytest jsonschema numpy scipy sympy mpmath
+          python -m pip install --quiet $MOTOR_DEPS
           python -m pytest tests -q -p no:cacheprovider -rs
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
+
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: Flutter - andamiaje, analisis y pruebas
-        working-directory: work/MATH_UNIVERSE/app
+
+      - name: Flutter - dependencias, analisis y pruebas
+        working-directory: app
         env:
-          MATH_UNIVERSE_ENGINE_DIR: ${{ github.workspace }}/work/MATH_UNIVERSE/engine
+          MATH_UNIVERSE_ENGINE_DIR: ${{ github.workspace }}/engine
         run: |
-          flutter create --platforms=windows,android --org com.mathuniverse --project-name math_universe_app .
+          flutter --version
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test --reporter expanded
-      - name: Integrar el motor Python (Chaquopy) en el proyecto Android
-        working-directory: work/MATH_UNIVERSE
+
+      - name: Integrar el motor Python (Chaquopy + SymPy + mpmath) en el proyecto Android
         run: python tools/ci/patch_android.py app engine
-      - name: Compilar APK (release)
-        working-directory: work/MATH_UNIVERSE/app
-        run: flutter build apk --release
-      - name: Huellas SHA-256
-        working-directory: work/MATH_UNIVERSE
+
+      - name: Compilar APK (release; arm64 para telefonos, x86_64 para emuladores)
+        working-directory: app
+        run: flutter build apk --release --target-platform android-arm64,android-x64
+
+      - name: Comprobar que el APK contiene el motor, SymPy y mpmath
         run: |
           mkdir -p dist
-          cp app/build/app/outputs/flutter-apk/app-release.apk dist/MATH_UNIVERSE_android.apk
-          (cd dist && sha256sum MATH_UNIVERSE_android.apk > SHA256_DE_LA_COMPILACION.txt && cat SHA256_DE_LA_COMPILACION.txt)
+          cp app/build/app/outputs/flutter-apk/app-release.apk dist/MATH_UNIVERSE.apk
+          unzip -l dist/MATH_UNIVERSE.apk | grep -E "chaquopy" | head -20
+          mkdir -p /tmp/apk && unzip -q -o dist/MATH_UNIVERSE.apk 'assets/chaquopy/*' -d /tmp/apk
+          for f in /tmp/apk/assets/chaquopy/*.imy; do echo "== $f"; unzip -l "$f" | grep -E "sympy/__init__|mpmath/__init__|math_universe_engine/dispatcher|mu_bridge" || true; done | tee /tmp/contenido.txt
+          grep -q "sympy/__init__" /tmp/contenido.txt
+          grep -q "mpmath/__init__" /tmp/contenido.txt
+          grep -q "math_universe_engine/dispatcher" /tmp/contenido.txt
+          grep -q "mu_bridge" /tmp/contenido.txt
+          ls -la dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: MATH_UNIVERSE_Android
-          path: work/MATH_UNIVERSE/dist/*
+          path: dist/MATH_UNIVERSE.apk
+          if-no-files-found: error
+
+  android_instalado_sin_red:
+    needs: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MATH_UNIVERSE_Android
+          path: dist
+      - name: Habilitar KVM para el emulador
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Emulador Android 14 - instalar el APK de release y ejecutar su autoprueba en MODO AVION
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash tools/ci/verify_android_install.sh dist/MATH_UNIVERSE.apk verificacion_android
+      - name: Huellas SHA-256
+        if: always()
+        run: |
+          mkdir -p verificacion_android
+          (cd dist && sha256sum MATH_UNIVERSE.apk) | tee verificacion_android/SHA256_ANDROID.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MATH_UNIVERSE_Android_verificacion
+          path: verificacion_android/*
+
+  publicar:
+    # Solo se publica lo que paso TODAS las pruebas y la verificacion instalada sin red en ambas plataformas.
+    needs: [windows, android, android_instalado_sin_red]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Preparar archivos
+        run: |
+          mkdir -p pub
+          cp art/MATH_UNIVERSE_Windows/MATH_UNIVERSE_SETUP.exe pub/
+          cp art/MATH_UNIVERSE_Windows/MATH_UNIVERSE_portable_windows.zip pub/
+          cp art/MATH_UNIVERSE_Windows/AUTOPRUEBA_WINDOWS.json pub/
+          cp art/MATH_UNIVERSE_Android/MATH_UNIVERSE.apk pub/
+          cp art/MATH_UNIVERSE_Android_verificacion/AUTOPRUEBA_ANDROID.txt pub/
+          (cd pub && sha256sum MATH_UNIVERSE_SETUP.exe MATH_UNIVERSE.apk MATH_UNIVERSE_portable_windows.zip > SHA256.txt && cat SHA256.txt)
+          ls -la pub
+      - name: Publicar en GitHub Releases (enlaces directos de descarga)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(grep -E '^version:' app/pubspec.yaml | sed -E 's/version: ([0-9.]+).*/\1/')
+          TAG="v$VER"
+          cat > notas.md <<EOF
+          MATH UNIVERSE $VER, compilado y verificado automaticamente desde el commit ${GITHUB_SHA::7} (rama ${GITHUB_REF_NAME}).
+
+          **Descargas**
+          - Windows: **MATH_UNIVERSE_SETUP.exe** (instalador; incluye el motor Python con SymPy y mpmath; no requiere internet)
+          - Android: **MATH_UNIVERSE.apk** (Android 7.0 o superior, 64 bits)
+
+          **Verificacion automatica de esta compilacion:** pruebas del motor (Windows y Linux), pruebas Flutter, motor empaquetado,
+          instalacion real en Windows sin red (firewall) y en un emulador Android en modo avion.
+          Informes: AUTOPRUEBA_WINDOWS.json y AUTOPRUEBA_ANDROID.txt.
+
+          No probado todavia en un telefono ni en un PC fisicos. Limitaciones: docs/LIMITACIONES.md
+          EOF
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" pub/* --target "$GITHUB_SHA" --title "MATH UNIVERSE $VER" --notes-file notas.md
+          echo "Publicado: https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG"

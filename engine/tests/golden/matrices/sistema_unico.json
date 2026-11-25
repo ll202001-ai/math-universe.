@@ -1,0 +1,45 @@
+{
+ "request": {
+  "operation": "matrix_solve",
+  "structured_input": {
+   "a": [
+    [
+     2,
+     1
+    ],
+    [
+     1,
+     3
+    ]
+   ],
+   "b": [
+    [
+     3
+    ],
+    [
+     5
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "x = [4/5, 7/5]",
+  "data": {
+   "kind": "unique",
+   "rank": 2,
+   "particular": [
+    "4/5",
+    "7/5"
+   ],
+   "nullspace_basis": [],
+   "free_columns": []
+  },
+  "verification": {
+   "status": "passed",
+   "method": "A·x_p = b y A·v = 0 para cada vector de la base del núcleo (exacto)"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

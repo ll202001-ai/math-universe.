@@ -1,0 +1,33 @@
+{
+ "request": {
+  "operation": "matrix_add",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     2
+    ]
+   ],
+   "b": [
+    [
+     1
+    ],
+    [
+     2
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "invalid_input",
+  "verification": {
+   "status": "not_performed",
+   "method": null
+  },
+  "error": {
+   "code": "INVALID_REQUEST"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

@@ -1,0 +1,50 @@
+{
+ "request": {
+  "operation": "matrix_mul",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     4,
+     5,
+     6
+    ]
+   ],
+   "b": [
+    [
+     1
+    ],
+    [
+     0
+    ],
+    [
+     2
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "[[7], [16]]",
+  "data": {
+   "matrix": [
+    [
+     "7"
+    ],
+    [
+     "16"
+    ]
+   ]
+  },
+  "verification": {
+   "status": "passed",
+   "method": "Freivalds exacto: (AB)v = A(Bv) con 6 vectores racionales"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

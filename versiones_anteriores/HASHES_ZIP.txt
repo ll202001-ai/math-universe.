@@ -1,0 +1,2 @@
+6e1713f69398ba716d18416e01f78d70cd62268286caef52b1f8e76c61ad893b  fase8/math_universe_fase8.zip
+c287ce1c787235d888b14623cb91e91fcc14fcb56ee7d46371b534f33feb493b  fase9b/math_universe_linalg_fase9b.zip

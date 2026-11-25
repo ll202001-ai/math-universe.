@@ -1,0 +1,43 @@
+{
+ "request": {
+  "operation": "matrix_solve",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   "b": [
+    [
+     1
+    ],
+    [
+     2
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "no_solution",
+  "exact_result": "Sin solución",
+  "data": {
+   "kind": "none",
+   "rank": 1,
+   "certificate_y": [
+    "-1",
+    "1"
+   ]
+  },
+  "verification": {
+   "status": "passed",
+   "method": "certificado de Farkas: yᵀA = 0 con yᵀb ≠ 0"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

@@ -1,0 +1,7 @@
+# Versiones minimas probadas. Para reproducibilidad exacta use requirements-lock.txt (se genera con: pip freeze)
+sympy>=1.12
+mpmath>=1.3
+numpy>=1.26
+scipy>=1.11
+jsonschema>=4.17
+pytest>=7.0

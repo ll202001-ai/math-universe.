@@ -1,0 +1,29 @@
+{
+ "request": {
+  "operation": "matrix_inverse",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "domain_error",
+  "verification": {
+   "status": "not_performed",
+   "method": null
+  },
+  "error": {
+   "code": "DOMAIN_ERROR"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

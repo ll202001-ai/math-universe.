@@ -1,0 +1,42 @@
+{
+ "request": {
+  "operation": "matrix_rank",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     2,
+     4,
+     6
+    ],
+    [
+     1,
+     0,
+     1
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "2",
+  "data": {
+   "rank": 2,
+   "pivot_columns": [
+    0,
+    1
+   ],
+   "nullity": 1
+  },
+  "verification": {
+   "status": "passed",
+   "method": "menor r×r no nulo (Bareiss) y nulidad ≥ n−r con A·v = 0"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

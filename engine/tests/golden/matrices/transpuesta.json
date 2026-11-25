@@ -1,0 +1,45 @@
+{
+ "request": {
+  "operation": "matrix_transpose",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     4,
+     5,
+     6
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "[[1, 4], [2, 5], [3, 6]]",
+  "data": {
+   "matrix": [
+    [
+     "1",
+     "4"
+    ],
+    [
+     "2",
+     "5"
+    ],
+    [
+     "3",
+     "6"
+    ]
+   ]
+  },
+  "verification": {
+   "status": "passed",
+   "method": "índice a índice: Tᵢⱼ = Aⱼᵢ"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}

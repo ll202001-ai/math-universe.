@@ -1,0 +1,48 @@
+{
+ "request": {
+  "operation": "matrix_rref",
+  "structured_input": {
+   "a": [
+    [
+     1,
+     2,
+     1
+    ],
+    [
+     2,
+     4,
+     0
+    ]
+   ]
+  }
+ },
+ "expected": {
+  "status": "success_exact",
+  "exact_result": "[[1, 2, 0], [0, 0, 1]]",
+  "data": {
+   "matrix": [
+    [
+     "1",
+     "2",
+     "0"
+    ],
+    [
+     "0",
+     "0",
+     "1"
+    ]
+   ],
+   "pivot_columns": [
+    0,
+    2
+   ],
+   "rank": 2
+  },
+  "verification": {
+   "status": "passed",
+   "method": "forma reducida: pivotes 1, ceros en su columna, filas nulas al final"
+  },
+  "warnings": [],
+  "conditions": []
+ }
+}
