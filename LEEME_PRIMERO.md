@@ -1,28 +1,37 @@
-# Cómo obtener MATH UNIVERSE (instalador de Windows y APK de Android)
+# Cómo instalar MATH UNIVERSE
 
-Usted **no tiene que ejecutar comandos ni instalar programas de desarrollo**. GitHub (gratis) compila todo por usted.
-Estos pasos se hacen **solo desde el navegador**. Tiempo: ~15 min de trabajo y ~30-60 min de espera de GitHub.
+No tiene que instalar Python, Flutter, SymPy ni ninguna herramienta de programación. Todo va dentro del instalador.
 
-## Una sola vez
-1. Entre a **github.com** e inicie sesión (o cree una cuenta gratuita).
-2. Arriba a la derecha: **+ → New repository**. Nombre: `math-universe`. Marque **Private**. Pulse **Create repository**.
-3. En la página del repositorio: **uploading an existing file** (o **Add file → Upload files**).
-   Arrastre **solo el archivo** `MATH_UNIVERSE_fase10.zip` (sin descomprimirlo). Espere a que termine y pulse **Commit changes**.
-4. **Add file → Create new file**. En el nombre escriba exactamente: `.github/workflows/construir.yml`
-   (al escribir las `/` GitHub crea las carpetas). Abra con el Bloc de notas el archivo `construir.yml` que le entregué, **copie todo su contenido** y péguelo en el cuadro grande. Pulse **Commit changes**.
+## Descargar
+En la página del repositorio en GitHub, sección **Releases** (columna derecha), abra la versión más reciente
+(`MATH UNIVERSE 0.5.0`) y descargue:
 
-## Obtener los instaladores
-5. Pestaña **Actions** (arriba). Verá «Construir MATH UNIVERSE». Si no empezó sola: entre en él → **Run workflow**.
-6. Espere a que los dos trabajos (**windows** y **android**) terminen (círculo verde ✔). Tarda 30-60 minutos.
-7. Entre en la ejecución terminada y baje a **Artifacts**: descargue
-   - **MATH_UNIVERSE_Windows** → dentro está `MATH_UNIVERSE_Setup_0.4.0.exe` (instalador) y `MATH_UNIVERSE_portable_windows.zip`.
-   - **MATH_UNIVERSE_Android** → dentro está `MATH_UNIVERSE_android.apk`.
-8. Windows: haga doble clic en `MATH_UNIVERSE_Setup_0.4.0.exe` (si Windows avisa «SmartScreen», pulse *Más información → Ejecutar de todas formas*: el instalador no está firmado todavía).
-   Android: pase el `.apk` al teléfono, ábralo y permita «instalar apps de esta fuente».
+| Equipo | Archivo |
+|---|---|
+| Windows 10 u 11 (64 bits) | `MATH_UNIVERSE_SETUP.exe` |
+| Android 7.0 o superior (64 bits) | `MATH_UNIVERSE.apk` |
 
-## Si algo sale en rojo ✖
-Entre en el trabajo que falló, pulse el paso en rojo y **copie su texto** (o haga una captura) y envíemelo. Yo lo corrijo y le entrego un ZIP nuevo; usted solo vuelve a subirlo (paso 3, reemplazando el ZIP) y a pulsar **Run workflow**.
-**Esto es esperable en la primera compilación:** el cliente Flutter y la compilación de Android se escribieron sin poder compilarlos en mi entorno (ver `docs/INFORME_ENTREGA_FASE10.md`).
+Cada versión publicada se compiló y se verificó automáticamente: se instaló sin conexión a internet y pasó su autoprueba
+(ver los archivos `AUTOPRUEBA_WINDOWS.json` y `AUTOPRUEBA_ANDROID.txt` de la misma versión).
 
-## Qué hace la aplicación
-Pestañas **Calculadora** (evaluar, simplificar, expandir, factorizar, resolver, derivar, integrar, límites), **Matrices** (suma, resta, producto, transpuesta, determinante, inversa, rango, forma escalonada, sistemas Ax=b; aritmética exacta) e **Historial** (se guarda en su equipo). Cada resultado indica si pasó la verificación independiente. Sin internet.
+## Windows
+1. Haga doble clic en `MATH_UNIVERSE_SETUP.exe`.
+2. Si aparece «Windows protegió su PC» (SmartScreen): **Más información → Ejecutar de todas formas**. El aviso sale porque
+   el instalador todavía no está firmado con un certificado comercial.
+3. Siga el asistente. No pide permisos de administrador. Se crean accesos directos en el menú Inicio y en el escritorio.
+4. Para desinstalar: Configuración → Aplicaciones → MATH UNIVERSE → Desinstalar.
+
+## Android
+1. Copie `MATH_UNIVERSE.apk` al teléfono (o descárguelo desde el teléfono) y ábralo.
+2. Permita «Instalar aplicaciones de esta fuente» cuando el teléfono lo pida.
+3. Si Google Play Protect avisa de una app desconocida: **Instalar de todas formas** (el APK no está publicado en Play Store).
+
+## Primer uso
+- Escriba un problema, por ejemplo `x^2-5*x+6=0`, y pulse el botón grande. La app sugiere la operación y usted puede
+  cambiarla (Calcular, Simplificar, Factorizar, Resolver, Derivar, Integrar, Límite).
+- Toque un ejemplo para insertarlo, o use el teclado científico (pestañas Básico, Funciones y Álgebra).
+- «Procedimiento y verificación» muestra cómo se obtuvo el resultado y cómo se comprobó.
+- Menú (⋮) → **Comprobar instalación**: ejecuta una autoprueba completa en su equipo, sin internet.
+- Menú (⋮) → **Acerca de y limitaciones**: lo que la app hace y lo que todavía no hace.
+
+Funciona sin conexión a internet. Ningún cálculo ni dato sale de su equipo.

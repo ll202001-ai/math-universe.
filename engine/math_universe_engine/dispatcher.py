@@ -47,9 +47,15 @@ def _dependencias():
     out = {"python": platform.python_version()}
     for mod in ("sympy", "mpmath", "jsonschema"):            # lista fija: nunca un nombre que venga de la entrada
         try:
-            out[mod] = getattr(importlib.import_module(mod), "__version__", "desconocida")
+            m = importlib.import_module(mod)
         except Exception:
             out[mod] = None
+            continue
+        try:
+            from importlib.metadata import version
+            out[mod] = version(mod)
+        except Exception:                                    # sin metadatos de distribución (empaquetados mínimos)
+            out[mod] = str(m.__dict__.get("__version__", "desconocida"))
     return out
 
 

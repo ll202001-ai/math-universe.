@@ -29,6 +29,7 @@ jobs:
       - name: Obtener el codigo (git directo; ver comentario)
         run: |
           git init -q .
+          git config core.autocrlf false
           git remote add origin "https://github.com/${{ github.repository }}.git"
           $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ github.token }}"))
           git -c http.extraheader="AUTHORIZATION: basic $auth" fetch -q --depth 1 origin ${{ github.sha }}

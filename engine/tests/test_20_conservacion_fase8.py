@@ -16,6 +16,7 @@ MODIFICADOS_DECLARADOS = {
     "engine/audit/comparar_sympy.py",                # 0.5.0: 0/0 sin evaluar y condiciones x ≠ k del motor (CI 2026-11-25)
     "engine/tests/test_05_entradas_y_aproximacion.py",  # 0.5.0: con mpmath, pi a 40 cifras ya no es una limitación
     "engine/tests/test_09_auditoria.py",             # 0.5.0: idem (la limitación solo persiste sin mpmath)
+    "engine/tests/test_06_seguridad_y_recursos.py",  # 0.5.0: la prueba decodifica el canal como UTF-8 (fallaba en Windows con Python < 3.15)
 }
 
 
@@ -54,9 +55,11 @@ def test_los_zip_de_las_versiones_anteriores_no_cambiaron():
     with open(os.path.join(RAIZ, "versiones_anteriores", "HASHES_ZIP.txt"), encoding="utf-8") as f:
         for l in f:
             if l.strip(): h, rel = l.rstrip("\n").split("  ", 1); hashes[rel] = h
-    assert set(hashes) == {"fase8/math_universe_fase8.zip", "fase9b/math_universe_linalg_fase9b.zip"}
+    assert set(hashes) == {"fase8/math_universe_fase8.zip", "fase9b/math_universe_linalg_fase9b.zip", "fase10/MATH_UNIVERSE_fase10.zip"}
     for rel, h in hashes.items():
         assert _h(os.path.join(RAIZ, "versiones_anteriores", rel)) == h, rel
     # y coinciden con los hashes entregados al usuario en su momento
     assert hashes["fase8/math_universe_fase8.zip"] == "6e1713f69398ba716d18416e01f78d70cd62268286caef52b1f8e76c61ad893b"
     assert hashes["fase9b/math_universe_linalg_fase9b.zip"] == "c287ce1c787235d888b14623cb91e91fcc14fcb56ee7d46371b534f33feb493b"
+    # ZIP de la fase 10 tal como estaba en el repositorio antes de versionar el código (ADR-4)
+    assert hashes["fase10/MATH_UNIVERSE_fase10.zip"] == "d22df69f13e5420ede1996a151b9bbce9880e7fe141bcc1165e5b6c8335ffd37"

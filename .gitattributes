@@ -1,0 +1,3 @@
+# Sin conversion de fin de linea: el checkout es identico byte a byte en Windows y Linux
+# (test_20 compara hashes con la fase 8 y los .bat conservan su CRLF).
+* -text

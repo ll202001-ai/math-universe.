@@ -105,7 +105,10 @@ def test_factorizacion_larga_respeta_timeout():
 def _run_server(lines):
     code = "import sys;sys.path.insert(0,sys.argv[1]);from math_universe_engine.server import main;main()"
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    p = subprocess.run([sys.executable, "-I", "-c", code, root], input="\n".join(lines) + "\n", text=True, capture_output=True, timeout=60)
+    # El canal es UTF-8 (lo fuerza el servidor). Se decodifica como UTF-8 de forma explícita: con text=True sin encoding,
+    # Python < 3.15 en Windows usaría cp1252 y la prueba fallaría aunque el servidor sea correcto (CI 2026-11-25).
+    p = subprocess.run([sys.executable, "-I", "-c", code, root], input="\n".join(lines) + "\n", text=True, encoding="utf-8",
+                       capture_output=True, timeout=60)
     return [json.loads(l) for l in p.stdout.splitlines()]
 
 
