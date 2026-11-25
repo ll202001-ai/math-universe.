@@ -17,6 +17,7 @@ MODIFICADOS_DECLARADOS = {
     "engine/tests/test_05_entradas_y_aproximacion.py",  # 0.5.0: con mpmath, pi a 40 cifras ya no es una limitación
     "engine/tests/test_09_auditoria.py",             # 0.5.0: idem (la limitación solo persiste sin mpmath)
     "engine/tests/test_06_seguridad_y_recursos.py",  # 0.5.0: la prueba decodifica el canal como UTF-8 (fallaba en Windows con Python < 3.15)
+    "engine/math_universe_engine/limits.py",         # 0.5.0: SymPy en un hilo donde no hay procesos hijo (Android/Chaquopy)
 }
 
 
