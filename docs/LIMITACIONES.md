@@ -1,17 +1,25 @@
-# Limitaciones conocidas · MATH UNIVERSE 0.5.0
+# Limitaciones conocidas · MATH UNIVERSE 0.6.0
 
-Lo que la versión 0.5.0 **no** hace todavía o hace con restricciones. Nada de esta lista se presenta en la app como
+Lo que la versión 0.6.0 **no** hace todavía o hace con restricciones. Nada de esta lista se presenta en la app como
 disponible. El catálogo exacto de operaciones no soportadas (generado y comprobado por las pruebas) está en
 `NO_SOPORTADO.md`.
 
 ## Funciones de la especificación aún no implementadas (planificadas)
-- Gráficas 2D/3D, estadística y probabilidad, autovalores/autovectores y descomposiciones (LU, QR, SVD), ecuaciones
-  diferenciales, series de Fourier y transformadas, números complejos como módulo propio, unidades y análisis
-  dimensional, métodos numéricos configurables, ingeniería eléctrica, física, cuaderno/proyectos y exportación a PDF.
-- Entrada manuscrita (OCR), por imagen, por voz y en lenguaje natural libre. El editor es de texto con teclado científico
-  (no un editor visual 2D de fracciones y exponentes).
-- Procedimiento paso a paso: la app muestra el método aplicado, la interpretación, las restricciones y la verificación
-  independiente, pero no una secuencia de transformaciones (no se inventan pasos).
+- Ecuaciones en derivadas parciales, elementos finitos, simulador de circuitos por análisis nodal, transformada de
+  Fourier, integrales múltiples, regresión e inferencia estadística (intervalos, pruebas de hipótesis), cuaderno y
+  proyectos, exportación a PDF.
+- Entrada manuscrita (OCR) o por imagen y asistente de IA en línea (requiere un proveedor y su clave; se diseñará como
+  servicio opcional). Las instrucciones en español se interpretan con reglas y SIEMPRE se piden confirmar.
+- Editor visual 2D (cursor dentro de fracciones y exponentes): la entrada es texto + teclado científico, con vista previa
+  dibujada de la fórmula.
+- Paso a paso: solo ecuaciones de primer y segundo grado, derivadas y Gauss-Jordan (inversa y sistemas). En lo demás
+  se muestran el método y la verificación independiente (no se inventan pasos).
+
+## Disponible desde 0.6.0 (con verificación independiente)
+Autovalores y autovectores (hasta 6×6), derivadas parciales, gradiente, Hessiano y Jacobiano, series de Taylor,
+inecuaciones de una variable, números complejos (binómica y polar), EDO (SymPy dsolve), transformada de Laplace
+directa e inversa, estadística descriptiva, unidades SI con análisis dimensional, biblioteca de fórmulas eléctricas,
+gráficas 2D/paramétricas/polares/3D, LaTeX de entrada y resultado.
 
 ## Restricciones del motor
 - Ecuaciones con radicales, valor absoluto, exponenciales, logaritmos o trigonométricas; cúbicas irreducibles; sistemas
@@ -21,6 +29,8 @@ disponible. El catálogo exacto de operaciones no soportadas (generado y comprob
 - Límites: series de Laurent; sin infinitos de funciones trascendentes.
 - Matrices: solo entradas numéricas exactas (enteros, fracciones, decimales), hasta 40×40; sin matrices simbólicas.
 - Supuestos (`real`, `positive`…) solo se aplican en simplificar/expandir/factorizar/resolver.
+- Gráficas: ceros y extremos marcados son aproximaciones numéricas del muestreo.
+- EDO y transformadas: si SymPy no encuentra solución cerrada se responde «No soportado» (todavía no hay solución numérica de EDO).
 - Cifras arbitrarias (mpmath) solo para expresiones sin variables; si el contraste independiente no cuadra, se dan
   ~15 cifras con aviso.
 

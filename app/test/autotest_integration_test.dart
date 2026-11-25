@@ -25,7 +25,7 @@ void main() {
       print('${k.ok ? 'OK   ' : 'FALLA'} ${k.name} :: ${k.detail}');
     }
     expect(rep.failed, 0, reason: rep.checks.where((k) => !k.ok).map((k) => '${k.name}: ${k.detail}').join('\n'));
-    expect(rep.checks.length, greaterThanOrEqualTo(17));
+    expect(rep.checks.length, greaterThanOrEqualTo(25));
     await c.dispose();
     await dir.delete(recursive: true);
   }, timeout: const Timeout(Duration(minutes: 5)));

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../engine/models.dart';
+import 'math_view.dart';
 
-/// Muestra una respuesta del motor sin reinterpretarla: resultado exacto, aproximacion opcional, condiciones, avisos
-/// y, en un panel desplegable, la interpretacion, el metodo aplicado y la verificacion independiente.
+/// Muestra una respuesta del motor sin reinterpretarla: resultado (dibujado en notacion matematica cuando el motor
+/// envia LaTeX), aproximacion, condiciones, avisos, datos estructurados y, en un panel, el procedimiento real del motor
+/// y su verificacion independiente.
 class ResultView extends StatelessWidget {
   const ResultView({super.key, required this.response, this.input});
   final EngineResponse response;
@@ -55,6 +57,7 @@ class ResultView extends StatelessWidget {
     final cs = t.colorScheme;
     final (vIcon, vText) = verificationText(r);
     final m = r.matrix;
+    final latex = r.latexResult;
     return Card(
       key: const Key('tarjeta_resultado'),
       elevation: 0,
@@ -70,23 +73,34 @@ class ResultView extends StatelessWidget {
                 backgroundColor: r.hasResult ? cs.primaryContainer : cs.errorContainer),
             Chip(key: const Key('chip_verificacion'), avatar: Icon(vIcon, size: 18), label: Text(vText)),
           ]),
+          if (r.latexInput != null) ...[
+            const SizedBox(height: 6),
+            Text('Entrada interpretada', style: t.textTheme.labelMedium),
+            MathView(r.latexInput, key: const Key('latex_entrada'), fontSize: 18, color: cs.onSurfaceVariant),
+          ],
           const SizedBox(height: 8),
           if (r.exactResult != null && m == null)
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               Expanded(
-                  child: SelectableText(r.exactResult!,
-                      key: const Key('texto_resultado'), style: t.textTheme.headlineSmall?.copyWith(fontFamily: 'monospace'))),
+                child: latex != null
+                    ? MathView(latex, key: const Key('latex_resultado'), fallback: r.exactResult, fontSize: 26)
+                    : SelectableText(r.exactResult!,
+                        key: const Key('texto_resultado'), style: t.textTheme.headlineSmall?.copyWith(fontFamily: 'monospace')),
+              ),
               IconButton(
-                  tooltip: 'Copiar el resultado',
+                  tooltip: 'Copiar el resultado (texto)',
                   icon: const Icon(Icons.copy, size: 20),
                   onPressed: () => Clipboard.setData(ClipboardData(text: r.exactResult!))),
             ]),
-          if (m != null) _MatrixTable(m),
+          if (latex != null && r.exactResult != null && m == null)
+            Text(r.exactResult!, key: const Key('texto_resultado'), style: t.textTheme.bodySmall?.copyWith(fontFamily: 'monospace')),
+          if (m != null) latex != null ? MathView(latex, fallback: r.exactResult, fontSize: 22) : _MatrixTable(m),
           if (r.approximateResult != null)
             Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: SelectableText('≈ ${r.approximateResult}', key: const Key('texto_aproximado'), style: t.textTheme.titleMedium)),
           if (r.data['kind'] == 'infinite' || r.data['kind'] == 'unique') _SolveDetails(r.data),
+          ..._structured(context, r),
           if (r.conditions.isNotEmpty)
             Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -96,21 +110,81 @@ class ResultView extends StatelessWidget {
             Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: SelectableText(r.errorMessage!, key: const Key('texto_error'), style: TextStyle(color: cs.error))),
-          if (r.raw['local'] != true)
+          if (r.raw['local'] != true && r.status != 'invalid_input')
             Theme(
               data: t.copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 key: const Key('panel_procedimiento'),
                 tilePadding: EdgeInsets.zero,
+                initiallyExpanded: r.steps.isNotEmpty,
                 childrenPadding: const EdgeInsets.only(bottom: 8),
                 expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                title: const Text('Procedimiento y verificación'),
+                title: Text(r.steps.isNotEmpty ? 'Procedimiento paso a paso' : 'Procedimiento y verificación'),
                 children: _details(context),
               ),
             ),
         ]),
       ),
     );
+  }
+
+  List<Widget> _structured(BuildContext context, EngineResponse r) {
+    final d = r.data;
+    final t = Theme.of(context).textTheme;
+    final out = <Widget>[];
+    Widget kv(String k, Object? v) => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 190, child: Text(k, style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SelectableText('${v ?? '—'}')),
+        ]));
+    if (d['eigenvalues'] is List) {
+      out.add(const SizedBox(height: 8));
+      if (d['characteristic_polynomial_latex'] != null) {
+        out.add(Text('Polinomio característico', style: t.labelMedium));
+        out.add(MathView('p(\\lambda) = ${d['characteristic_polynomial_latex']}', fontSize: 18));
+      }
+      for (final e in (d['eigenvalues'] as List).whereType<Map>()) {
+        final vecs = (e['vectors'] as List? ?? []).map((v) => '(${(v as List).join(', ')})').join('; ');
+        out.add(kv('λ = ${e['value']}  (mult. ${e['multiplicity']})', 'autovector(es): $vecs'));
+      }
+      out.add(kv('Diagonalizable', d['diagonalizable'] == true ? 'sí' : 'no'));
+    }
+    if (d.containsKey('mean') && d.containsKey('median')) {
+      out.add(const SizedBox(height: 8));
+      for (final (k, key) in [
+        ('n', 'n'),
+        ('Media', 'mean'),
+        ('Mediana', 'median'),
+        ('Moda', 'mode'),
+        ('Mínimo', 'min'),
+        ('Máximo', 'max'),
+        ('Rango', 'range'),
+        ('Varianza (población)', 'variance_population'),
+        ('Varianza (muestra)', 'variance_sample'),
+        ('Desv. típica (población)', 'std_population'),
+        ('Desv. típica (muestra)', 'std_sample'),
+        ('Q1', 'q1'),
+        ('Q3', 'q3'),
+        ('Rango intercuartílico', 'iqr'),
+      ]) {
+        final v = d[key];
+        out.add(kv(k, v is List ? (v.isEmpty ? 'sin moda' : v.join(', ')) : v));
+      }
+    }
+    if (d.containsKey('modulus') && d.containsKey('argument')) {
+      out.add(const SizedBox(height: 8));
+      out.add(kv('Parte real', d['real']));
+      out.add(kv('Parte imaginaria', d['imaginary']));
+      out.add(kv('Módulo', d['modulus']));
+      out.add(kv('Argumento', '${d['argument']} rad  (${d['argument_degrees']}°)'));
+      out.add(kv('Forma polar', d['polar']));
+      out.add(kv('Conjugado', d['conjugate']));
+    }
+    if (d['formula'] != null && d['name'] != null) {
+      out.add(kv('Fórmula', '${d['name']}: ${d['formula']}'));
+    }
+    return out;
   }
 
   List<Widget> _details(BuildContext context) {
@@ -123,24 +197,34 @@ class ResultView extends StatelessWidget {
           TextSpan(text: '$k: ', style: const TextStyle(fontWeight: FontWeight.w600)),
           TextSpan(text: v),
         ])));
+    final steps = r.steps;
     return [
+      if (steps.isNotEmpty)
+        for (var i = 0; i < steps.length; i++)
+          Padding(
+            key: Key('paso_$i'),
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${i + 1}. ${steps[i].text}', style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+              if (steps[i].latex != null) MathView(steps[i].latex, fontSize: 18),
+            ]),
+          ),
       if (input != null) row('Problema original', input!),
       if (r.interpretation != null) row('Interpretación del motor', r.interpretation!),
       if (r.method != null) row('Método aplicado', describeMethod(r.method)),
-      row(
-          'Verificación',
-          r.verificationStatus == 'passed'
-              ? 'satisfactoria — ${describeMethod(r.verificationMethod)}'
-              : verificationText(r).$2),
+      row('Verificación',
+          r.verificationStatus == 'passed' ? 'satisfactoria — ${describeMethod(r.verificationMethod)}' : verificationText(r).$2),
       if (r.conditions.isNotEmpty) row('Restricciones conservadas', r.conditions.join(', ')),
-      Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(
-            'Resultado calculado por el motor; no se dispone de un procedimiento simbólico detallado paso a paso. '
-            'Se muestran el método aplicado y la comprobación independiente.',
-            style: t.bodySmall),
-      ),
-      if (r.elapsedMs != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text('${r.elapsedMs!.toStringAsFixed(1)} ms', style: t.bodySmall)),
+      if (steps.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+              'Resultado calculado por el motor; para esta operación no se dispone de un procedimiento simbólico detallado. '
+              'Se muestran el método aplicado y la comprobación independiente.',
+              style: t.bodySmall),
+        ),
+      if (r.elapsedMs != null)
+        Padding(padding: const EdgeInsets.only(top: 4), child: Text('${r.elapsedMs!.toStringAsFixed(1)} ms', style: t.bodySmall)),
     ];
   }
 }

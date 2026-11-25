@@ -44,7 +44,8 @@ void main() {
 
   test('todas las operaciones de matrices del contrato 1.1 estan en la interfaz', () {
     expect(matrixOperations.keys.toSet(), {
-      'matrix_add', 'matrix_sub', 'matrix_mul', 'matrix_transpose', 'matrix_det', 'matrix_inverse', 'matrix_rank', 'matrix_rref', 'matrix_solve'
+      'matrix_add', 'matrix_sub', 'matrix_mul', 'matrix_transpose', 'matrix_det', 'matrix_inverse', 'matrix_rank', 'matrix_rref', 'matrix_solve',
+      'eigen'
     });
     expect(matrixOpsNeedingB, {'matrix_add', 'matrix_sub', 'matrix_mul', 'matrix_solve'});
   });

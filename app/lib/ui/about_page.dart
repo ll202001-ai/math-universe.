@@ -61,11 +61,13 @@ class _AboutPageState extends State<AboutPage> {
 }
 
 const knownLimitations = <String>[
-  'No hay todavía gráficas, estadística, autovalores, ecuaciones diferenciales ni ingeniería eléctrica: están planificados, no implementados.',
-  'No hay entrada manuscrita, por voz ni en lenguaje natural libre: se escribe la expresión o se usa el teclado científico.',
-  'No se muestra un procedimiento paso a paso: se indican el método aplicado y la verificación independiente.',
-  'Ecuaciones con radicales, valor absoluto, exponenciales o trigonométricas y algunas integrales devuelven «No soportado».',
-  'Los resultados de SymPy (respaldo) se marcan como tales y pasan por la misma verificación independiente.',
-  'Matrices: solo entradas numéricas exactas (enteros, fracciones, decimales), hasta 40×40.',
+  'Todavía no hay ecuaciones en derivadas parciales, elementos finitos, simulador de circuitos por nodos ni transformada de Fourier.',
+  'No hay entrada manuscrita ni por imagen, y no hay asistente de IA en línea: las instrucciones en español se interpretan con reglas y siempre se piden confirmar.',
+  'El paso a paso cubre ecuaciones de primer y segundo grado, derivadas y Gauss-Jordan. En el resto se muestran el método y la verificación, sin inventar pasos.',
+  'Ecuaciones con radicales, valor absoluto, exponenciales o trigonométricas y algunas integrales pueden devolver «No soportado».',
+  'Los resultados calculados con SymPy se marcan como tales y pasan por una comprobación independiente. Si no se puede comprobar, se indica.',
+  'Ceros y extremos marcados en las gráficas son aproximaciones numéricas del muestreo.',
+  'Matrices: solo entradas numéricas exactas, hasta 40×40 (autovalores exactos hasta 6×6).',
+  'Ingeniería: cálculos de apoyo; no sustituyen un diseño certificado ni una inspección profesional.',
   'El instalador de Windows y el APK no están firmados con un certificado comercial: Windows o Android pueden mostrar un aviso.',
 ];

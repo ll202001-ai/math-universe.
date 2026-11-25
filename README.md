@@ -1,4 +1,4 @@
-# MATH UNIVERSE · versión 0.5.0 (motor 0.5.0 · contrato 1.1)
+# MATH UNIVERSE · versión 0.6.0 (motor 0.6.0 · contrato 1.2)
 
 Calculadora matemática exacta para Windows y Android. Funciona sin internet: el motor matemático (Python con SymPy y
 mpmath) va dentro de la aplicación. **Para instalarla, lea [`LEEME_PRIMERO.md`](LEEME_PRIMERO.md).**

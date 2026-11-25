@@ -4,7 +4,7 @@ No tiene que instalar Python, Flutter, SymPy ni ninguna herramienta de programac
 
 ## Descargar
 En la página del repositorio en GitHub, sección **Releases** (columna derecha), abra la versión más reciente
-(`MATH UNIVERSE 0.5.0`) y descargue:
+(`MATH UNIVERSE 0.6.0`) y descargue:
 
 | Equipo | Archivo |
 |---|---|

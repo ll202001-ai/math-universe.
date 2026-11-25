@@ -132,7 +132,53 @@ Future<AutotestReport> runAutotest(EngineClient engine, Future<HistoryStore> Fun
     }
   }, (r) => r.exactResult == '[[1, -1], [-1, 2]]' && verified(r) && (r.verificationMethod ?? '').contains('= I'));
 
-  // 4. Persistencia SQLite real: escribir, cerrar, reabrir, leer, borrar.
+  // 4. Modulos 0.6.0 (SymPy + verificacion independiente), presentacion, pasos y graficas.
+  await expectEngine('Autovalores de [[2,1],[1,2]] = {1, 3} (A·v = λ·v)', {
+    'operation': 'eigen',
+    'structured_input': {
+      'a': [
+        ['2', '1'],
+        ['1', '2']
+      ]
+    }
+  }, (r) {
+    final ev = (r.data['eigenvalues'] as List?)?.whereType<Map>().map((e) => e['value'].toString()).toSet() ?? {};
+    return verified(r) && ev.length == 2 && ev.containsAll({'1', '3'});
+  }, ms: 60000);
+  await expectEngine("EDO y''+y=0 con y(0)=0, y'(0)=1 → sin(x)", {
+    'operation': 'ode',
+    'expression': "y''+y=0",
+    'conditions': ['y(0)=0', "y'(0)=1"]
+  }, (r) => r.exactResult == 'y(x) = sin(x)' && verified(r), ms: 120000);
+  await expectEngine('Transformada de Laplace de e^(3t) = 1/(s-3)', {'operation': 'laplace', 'expression': 'exp(3*t)'},
+      (r) => r.exactResult == '1/(s - 3)' && verified(r), ms: 120000);
+  await expectEngine('Unidades: 36 km/h = 10 m/s', {'operation': 'units', 'expression': '36 km/h to m/s'},
+      (r) => r.exactResult == '10 m/s' && verified(r), ms: 60000);
+  await expectEngine('Ley de Ohm: V=12, R=4 → I=3', {
+    'operation': 'formula',
+    'params': {
+      'id': 'ohm',
+      'known': {'V': '12', 'R': '4'},
+      'unknown': 'I'
+    }
+  }, (r) => r.exactResult == 'I = 3' && verified(r), ms: 60000);
+  await expectEngine('Notación matemática: LaTeX de (x^3-8)/(x-2)', {
+    'operation': 'simplify',
+    'expression': '(x^3-8)/(x-2)',
+    'latex': true
+  }, (r) => (r.latexInput ?? '').contains(r'\frac') && r.latexResult == 'x^{2} + 2 x + 4');
+  await expectEngine('Paso a paso de x^2-5*x+6=0 termina en las raíces', {
+    'operation': 'solve',
+    'expression': 'x^2-5*x+6=0',
+    'steps': true
+  }, (r) => r.steps.length >= 4 && r.steps.last.latex == r'x = 2,\quad x = 3');
+  await expectEngine('Gráfica de 1/x: la asíntota corta la curva', {
+    'operation': 'plot',
+    'expression': '1/x',
+    'params': {'xmin': -2, 'xmax': 2, 'samples': 101}
+  }, (r) => (((r.data['series'] as List?)?.first as Map?)?['segments'] as List?)?.length == 2);
+
+  // 5. Persistencia SQLite real: escribir, cerrar, reabrir, leer, borrar.
   final marker = 'autoprueba-${DateTime.now().microsecondsSinceEpoch}';
   try {
     final s1 = await openStore();

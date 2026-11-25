@@ -32,7 +32,7 @@ void main() {
 
     expect(find.text('resultado:1/3+1/6'), findsOneWidget);
     expect(find.text('Verificado de forma independiente'), findsOneWidget);
-    final sent = eng.received.last;
+    final sent = eng.lastCalc;
     expect(sent['operation'], 'evaluate');
     expect(sent['expression'], '1/3+1/6');
     expect((await store.list()).length, 1);
@@ -52,7 +52,7 @@ void main() {
     await tester.tap(find.byKey(const Key('boton_calcular_matriz')));
     await tester.pumpAndSettle();
 
-    final sent = eng.received.last;
+    final sent = eng.lastCalc;
     expect(sent['operation'], 'matrix_inverse');
     expect(sent['structured_input'], {'a': [['1', '2'], ['3', '4']]});
     expect(find.byKey(const Key('tabla_matriz')), findsOneWidget);
@@ -111,7 +111,7 @@ void main() {
     expect(find.textContaining('Operación sugerida: Resolver'), findsOneWidget);
     await tester.tap(find.byKey(const Key('boton_calcular')));
     await tester.pumpAndSettle();
-    expect(eng.received.last['operation'], 'solve');
+    expect(eng.lastCalc['operation'], 'solve');
 
     await tester.enterText(find.byKey(const Key('campo_expresion')), 'x^2-5*x+6');
     await tester.tap(find.byKey(const Key('op_factor')));
@@ -119,8 +119,8 @@ void main() {
     expect(find.textContaining('Operación elegida: Factorizar'), findsOneWidget);
     await tester.tap(find.byKey(const Key('boton_calcular')));
     await tester.pumpAndSettle();
-    expect(eng.received.last['operation'], 'factor');
-    expect(eng.received.last['expression'], 'x^2-5*x+6');
+    expect(eng.lastCalc['operation'], 'factor');
+    expect(eng.lastCalc['expression'], 'x^2-5*x+6');
   });
 
   testWidgets('el teclado cientifico inserta en el cursor y calcula', (tester) async {
@@ -149,6 +149,9 @@ void main() {
   });
 
   testWidgets('el panel de procedimiento muestra metodo y verificacion reales del motor', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final eng = FakeEngine((req) => req['operation'] == 'ping'
         ? okResponse('pong')
         : {
@@ -161,6 +164,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('campo_expresion')), 'x^2-5*x+6=0');
     await tester.tap(find.byKey(const Key('boton_calcular')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Procedimiento y verificación'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Procedimiento y verificación'));
     await tester.pumpAndSettle();

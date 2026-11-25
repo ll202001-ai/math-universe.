@@ -7,6 +7,8 @@ import '../engine/models.dart';
 import 'about_page.dart';
 import 'calculator_page.dart';
 import 'diagnostics_page.dart';
+import 'engineering_page.dart';
+import 'graph_page.dart';
 import 'history_page.dart';
 import 'matrix_page.dart';
 
@@ -72,7 +74,9 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       CalculatorPage(key: _calcKey, engine: widget.engine, store: widget.store, initialExpression: _reuseExpr, initialOperation: _reuseOp),
+      GraphPage(engine: widget.engine),
       MatrixPage(engine: widget.engine, store: widget.store),
+      EngineeringPage(engine: widget.engine, store: widget.store),
       HistoryPage(
           key: _histKey,
           store: widget.store,
@@ -91,11 +95,13 @@ class _HomePageState extends State<HomePage> {
     final cs = Theme.of(context).colorScheme;
     void select(int i) => setState(() {
           _tab = i;
-          if (i == 2) _histKey = UniqueKey(); // recarga el historial al entrar
+          if (i == 4) _histKey = UniqueKey(); // recarga el historial al entrar
         });
     const destinations = [
       (Icons.functions, 'Calculadora'),
+      (Icons.show_chart, 'Gráficas'),
       (Icons.grid_on, 'Matrices'),
+      (Icons.bolt, 'Ingeniería'),
       (Icons.history, 'Historial'),
     ];
     return LayoutBuilder(builder: (context, box) {

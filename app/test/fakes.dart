@@ -10,6 +10,10 @@ class FakeEngine implements EngineClient {
   final Map<String, dynamic> Function(Map<String, dynamic> req) handler;
   final List<Map<String, dynamic>> received = [];
 
+  /// Ultima solicitud de CALCULO (excluye vista previa, graficas de fondo, catalogos y ping).
+  Map<String, dynamic> get lastCalc =>
+      received.lastWhere((r) => !const {'parse', 'plot', 'formulas', 'interpret', 'ping', 'capabilities'}.contains(r['operation']));
+
   @override
   Future<EngineResponse> send(Map<String, dynamic> request, {Duration? timeout}) async {
     received.add(request);

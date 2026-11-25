@@ -1,4 +1,4 @@
-# Registro de decisiones técnicas (ADR) · versión 0.5.0
+# Registro de decisiones técnicas (ADR) · versión 0.6.0
 
 Las ADR-1 a ADR-3 están en `CONTRATO.md` (motor propio + respaldo SymPy verificado, dominio real por defecto, `log` = `ln`).
 
@@ -44,3 +44,25 @@ Las ADR-1 a ADR-3 están en `CONTRATO.md` (motor propio + respaldo SymPy verific
 ## ADR-10 · mpmath para cifras arbitrarias
 - Solo se usa si se piden más de 15 cifras para un resultado no racional. El valor se contrasta con la evaluación en
   coma flotante (`math`), que es independiente. Si no coinciden, no se entrega y se avisa.
+
+## ADR-11 · Módulos avanzados con SymPy, siempre con verificación independiente (0.6.0)
+- **Problema:** la 0.5.0 era «muy básica» (solo el motor exacto propio). Reescribir un CAS completo no es razonable.
+- **Decisión:** SymPy calcula autovalores, EDO, transformadas, series, etc.; cada resultado se comprueba por una vía
+  distinta (A·v = λ·v exacto, diferencias finitas mpmath, `checkodesol`, cuadratura numérica de mpmath, módulo
+  `statistics`, `cmath`, reconversión de unidades). Si la comprobación falla, el resultado no se entrega. Las pruebas
+  usan valores conocidos a mano e incluyen verificaciones saboteadas.
+- **Contrato 1.2 (aditivo):** operaciones nuevas, `params`, `conditions`, `latex`, `steps`.
+
+## ADR-12 · Presentación matemática con LaTeX generado por el motor
+- El motor genera LaTeX con SymPy **sin evaluar** (lo que se dibuja es exactamente lo calculado; `sqrt(x)^2` no se
+  convierte en `x`). La app lo dibuja con `flutter_math_fork` (Dart puro, sin WebView, funciona sin red) y, si falla,
+  muestra el texto. Alternativa descartada: `flutter_tex` (WebView, peor rendimiento y depende del motor web).
+
+## ADR-13 · Gráficas: el motor muestrea, la app dibuja
+- El muestreo usa el mismo AST seguro (sin `eval`), corta la curva en asíntotas y puntos no definidos, y marca ceros
+  (bisección) y extremos. La app usa un `CustomPainter` propio (zoom, desplazamiento, remuestreo al cambiar la vista,
+  3D con giro). Se descartó `fl_chart`: no permite remuestrear la vista ni cortar asíntotas con control fino.
+
+## ADR-14 · Lenguaje natural por reglas, no por IA (por ahora)
+- «deriva x al cubo por seno de x» → operación + expresión; la app muestra «Entendí: …» y solo calcula al confirmar.
+  Una IA en línea requeriría proveedor, clave y consentimiento de envío de datos; queda como servicio opcional futuro.

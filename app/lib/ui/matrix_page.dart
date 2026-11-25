@@ -49,7 +49,9 @@ class _MatrixPageState extends State<MatrixPage> {
     final r = await widget.engine.send({
       'operation': _op,
       'structured_input': {'a': a, 'b': ?b},
-      'timeout_ms': 20000,
+      'timeout_ms': 30000,
+      'latex': true,
+      'steps': true, // Gauss-Jordan paso a paso (inversa y sistemas), contrastado con el resultado del motor
     });
     await widget.store.add(HistoryEntry(
         createdAt: DateTime.now(),
