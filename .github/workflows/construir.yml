@@ -1,0 +1,103 @@
+# MATH UNIVERSE - compilacion automatica desde el ZIP subido al repositorio (Windows + Android).
+# Ruta de este archivo en el repositorio:  .github/workflows/construir.yml
+# El repositorio solo necesita: este archivo y el ZIP  MATH_UNIVERSE_fase10.zip  en la raiz.
+name: Construir MATH UNIVERSE (Windows y Android)
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descomprimir el ZIP
+        shell: pwsh
+        run: |
+          Expand-Archive -Path MATH_UNIVERSE_fase10.zip -DestinationPath work -Force
+          Get-ChildItem work/MATH_UNIVERSE | Select-Object -First 20 | ForEach-Object Name
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Motor - pruebas completas (con SymPy y NumPy reales)
+        shell: pwsh
+        working-directory: work/MATH_UNIVERSE/engine
+        run: |
+          python -m pip install --quiet pytest jsonschema numpy scipy sympy mpmath
+          python -m pytest tests -q -p no:cacheprovider -rs
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter - andamiaje, analisis y pruebas (incluye prueba real cliente Dart <-> motor Python)
+        shell: pwsh
+        working-directory: work/MATH_UNIVERSE/app
+        env:
+          MATH_UNIVERSE_ENGINE_DIR: ${{ github.workspace }}\work\MATH_UNIVERSE\engine
+        run: |
+          flutter create --platforms=windows,android --org com.mathuniverse --project-name math_universe_app .
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+      - name: Flutter - compilar Windows (release)
+        shell: pwsh
+        working-directory: work/MATH_UNIVERSE/app
+        run: flutter build windows --release
+      - name: Empaquetar (Python embebido + motor), probar el motor empaquetado y crear instalador
+        shell: pwsh
+        working-directory: work/MATH_UNIVERSE
+        run: ./tools/ci/package_windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MATH_UNIVERSE_Windows
+          path: work/MATH_UNIVERSE/dist/*
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descomprimir el ZIP
+        run: unzip -q MATH_UNIVERSE_fase10.zip -d work
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Motor - pruebas (Linux)
+        working-directory: work/MATH_UNIVERSE/engine
+        run: |
+          python -m pip install --quiet pytest jsonschema numpy scipy sympy mpmath
+          python -m pytest tests -q -p no:cacheprovider -rs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter - andamiaje, analisis y pruebas
+        working-directory: work/MATH_UNIVERSE/app
+        env:
+          MATH_UNIVERSE_ENGINE_DIR: ${{ github.workspace }}/work/MATH_UNIVERSE/engine
+        run: |
+          flutter create --platforms=windows,android --org com.mathuniverse --project-name math_universe_app .
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+      - name: Integrar el motor Python (Chaquopy) en el proyecto Android
+        working-directory: work/MATH_UNIVERSE
+        run: python tools/ci/patch_android.py app engine
+      - name: Compilar APK (release)
+        working-directory: work/MATH_UNIVERSE/app
+        run: flutter build apk --release
+      - name: Huellas SHA-256
+        working-directory: work/MATH_UNIVERSE
+        run: |
+          mkdir -p dist
+          cp app/build/app/outputs/flutter-apk/app-release.apk dist/MATH_UNIVERSE_android.apk
+          (cd dist && sha256sum MATH_UNIVERSE_android.apk > SHA256_DE_LA_COMPILACION.txt && cat SHA256_DE_LA_COMPILACION.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MATH_UNIVERSE_Android
+          path: work/MATH_UNIVERSE/dist/*
