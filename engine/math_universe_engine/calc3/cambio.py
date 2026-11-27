@@ -209,10 +209,6 @@ def cambio_variables_caja(f_txt, old, new, mapa_txt, modo, niveles):
     pasos.append({"text": "Jacobiano", "latex": r"\frac{\partial(%s)}{\partial(%s)} = %s = %s" % (",".join(old), ",".join(new), _lat_matriz(M), lat(J))})
     fnew = _f_nueva(f_txt, old, sol, mapa_txt, modo)
     # signo de J en el centro de la caja
-    env = {}
-    for lv in niveles:
-        lo, hi = lv["lo"].eval(env), lv["hi"].eval(env)
-        env[lv["var"]] = (lo + hi) / 2
     # los límites pueden depender de las variables externas: se recorren de la externa a la interna
     env = {}
     for lv in reversed(niveles):

@@ -148,12 +148,15 @@ def triple_sobre_region(f, zinf, zsup, curvas, orden="dydx", punto=None, nombre=
     zi, zs = P(zinf), P(zsup)
     curvas = list(curvas)
     pasos = []
-    if proyeccion_auto:
-        try:
-            eq = f"({zinf})-({zsup})=0"
-            curvas.append(eq.replace("=0", "") + "=0")
-        except Exception:
-            pass
+    base_curvas = list(curvas)
+    dif = zi - zs
+    constante = all(not (isinstance(a, str) and a in ("x", "y")) for a in [])  # placeholder, se refina abajo
+    try:
+        constante = dif.eval({"x": 0.3, "y": 0.7}) == dif.eval({"x": 1.1, "y": -0.4}) == dif.eval({"x": -0.9, "y": 2.3})
+    except Exception:
+        constante = False
+    if proyeccion_auto and not constante:
+        curvas.append(f"({zinf})-({zsup})=0")
     from .integra import integrate
     try:
         Fz = integrate(fe, "z")
@@ -169,7 +172,16 @@ def triple_sobre_region(f, zinf, zsup, curvas, orden="dydx", punto=None, nombre=
         x, y = kw["x"], kw["y"]
         a, b = zi.eval(kw), zs.eval(kw)
         return q1(lambda z: fn_f(x, y, z), [(a, b)])[0]
-    r = integral_region(G, curvas, orden, nombre=nombre, f_num=fnum, punto=punto)
+    r = None
+    if len(base_curvas) >= 2 and len(curvas) > len(base_curvas):
+        # si las curvas dadas ya cierran una región, la proyección extra solo estorba
+        try:
+            r = integral_region(G, base_curvas, orden, nombre=nombre, f_num=fnum, punto=punto)
+            curvas = base_curvas
+        except Exception:
+            r = None
+    if r is None:
+        r = integral_region(G, curvas, orden, nombre=nombre, f_num=fnum, punto=punto)
     r["pasos"] = pasos + r["pasos"]
     r["curvas_D"] = curvas
     return r
