@@ -651,6 +651,12 @@ def _inverse(b):
 
 
 def _power(a, r):
+    if not a.is_gp() and r.denominator != 1:
+        try:
+            a2 = pitag(a)
+            if a2.is_gp(): a = a2
+        except Exception:
+            pass
     if r.denominator == 1 and r >= 0 and not a.is_gp():
         out = Expr.of(1)
         for _ in range(int(r)): out = out * a

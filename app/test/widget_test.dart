@@ -40,6 +40,8 @@ void main() {
     final store = MemoryHistoryStore();
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: store));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
+    await tester.pumpAndSettle();
     expect(find.text('Motor local listo'), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('campo_expresion')), '1/3+1/6');
@@ -57,6 +59,8 @@ void main() {
   testWidgets('matrices: envia structured_input exacto y muestra la tabla del resultado', (tester) async {
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Matrices'));
     await tester.pumpAndSettle();
@@ -79,6 +83,8 @@ void main() {
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
+    await tester.pumpAndSettle();
     final before = eng.received.length;
     await tester.tap(find.text('Matrices'));
     await tester.pumpAndSettle();
@@ -99,6 +105,8 @@ void main() {
           });
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('campo_expresion')), '1/0');
     await tester.tap(find.byKey(const Key('boton_calcular')));
     await tester.pumpAndSettle();
@@ -115,6 +123,8 @@ void main() {
         });
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Motor no disponible'), findsOneWidget);
   });
 
@@ -124,6 +134,8 @@ void main() {
     addTearDown(tester.view.reset);
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('campo_expresion')), 'x^2-5*x+6=0');
     await tester.pump();
@@ -148,6 +160,8 @@ void main() {
     addTearDown(tester.view.reset);
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
     await tester.pumpAndSettle();
     Future<void> key(String id) async {
       await tester.tap(find.byKey(Key('tecla_$id')));
@@ -194,6 +208,8 @@ void main() {
     addTearDown(tester.view.reset);
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
     await tester.pumpAndSettle();
     Future<void> key(String id) async {
       await tester.tap(find.byKey(Key('tecla_$id')));
@@ -251,6 +267,8 @@ void main() {
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
+    await tester.pumpAndSettle();
     final before = eng.received.length;
     await tester.tap(find.byKey(const Key('tecla_fracción')));
     await tester.pump();
@@ -276,6 +294,8 @@ void main() {
             'parsed_input': {'canonical': 'x^2 - 5*x + 6 = 0'},
           });
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Calculadora'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('campo_expresion')), 'x^2-5*x+6=0');
     await tester.tap(find.byKey(const Key('boton_calcular')));

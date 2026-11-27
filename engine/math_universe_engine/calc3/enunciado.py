@@ -12,6 +12,8 @@ from ..parser import parse
 from ..ast_tools import normalize, free_symbols, to_str as ast_str, subs as ast_subs
 from .texto import normalizar, quitar_acentos, mx, ecuaciones, tokens_texto, _separar_conjunciones, _REL
 from .numerico import compile_ast
+from . import contraste as CT
+from . import politopo as PO
 
 COORD = {"x", "y", "z"}
 CONST_SYM = {"pi", "e"}
@@ -253,8 +255,10 @@ def _optimizacion(T, texto, ecs):
             ext = "maximo" if "maximo" in T and "minimo" not in T else "minimo"
             return {"tipo": "parametros_condicion", "f": obj, "variables": vars_, "punto": ["0"] * nv, "parametro": params[0], "extremo": ext}, \
                 [f"Se busca el valor de {params[0]} para el que el origen es un {ext} local"]
+    restr = [x for x in restr if x.es_igualdad]
     if restr:
-        positivo = bool(re.search(r"\^\(\s*\d+\s*/\s*\d+\s*\)", obj)) or "primer octante" in T or "no negativ" in T
+        positivo = bool(re.search(r"\^\(\s*\d+\s*/\s*\d+\s*\)", obj)) or "primer octante" in T or "no negativ" in T or "positiv" in T \
+            or bool(re.search(r"[xyz](?:\s*,\s*[xyz])*\s*(?:>|>=)\s*0", T))
         return {"tipo": "lagrange", "f": obj, "restricciones": [e.como_curva() for e in restr], "variables": vars_, "positivo": positivo}, \
             [f"Optimizar f = {obj} sujeta a {'; '.join(e.crudo for e in restr)} (multiplicadores de Lagrange)"]
     return {"tipo": "extremos", "f": obj, "variables": vars_}, [f"Extremos locales de f = {obj} (puntos críticos y criterio de la Hessiana)"]
@@ -421,7 +425,9 @@ def _region_geom(ecs, n, T):
     cadenas = []; curvas = []; simples = []
     for e, sc in ecs:
         if e.cabecera is not None:
-            cab[e.cabecera[0]] = e
+            nom = e.cabecera[0]
+            if nom in ("rho", "mu", "sigma", "lam", "dens", "densidad") and set(e.cabecera[1]) <= COORD: nom = "delta"
+            cab[nom] = e
         elif e.es_igualdad and e.lhs in HEADERS and e.lhs != "V" and not re.search(r"[xyz]", e.lhs):
             cab[e.lhs] = e
         elif len(e.ops) == 2 and all(o in ("<=", "<", ">=", ">") for o in e.ops):
@@ -472,6 +478,8 @@ def _quantity(T, n):
 
 
 def _integrando_texto(n):
+    m0 = re.search(r"integral(?:es)?\s+(?:doble|triple|iterada)?\s*de\s+(.+?)\s+(?:d[AV]\b|sobre\b|en\s+(?:la|el|r|e)\b|donde\b|extendida\b|para\b)", n, re.I)
+    if m0 and not re.search(r"DOBLEINT|TRIPLEINT|∫", n): return mx(m0.group(1))
     m = re.search(r"(?:DOBLEINT|TRIPLEINT|∫)\s*(?:_\{?[A-Za-z]\}?\s+|[A-Z]\s+)?(.+?)\s*d[VAS]\b", n)
     if m: return mx(m.group(1))
     return None
@@ -1152,16 +1160,485 @@ def clasificar(texto):
         return _jacobiano(T, ecs)
     if any(k in T for k in ("minimos cuadrados", "regresion lineal", "recta de ajuste", "ajuste de una recta")) or ("recta" in T and "ajuste" in T):
         return _ajuste(T, texto)
+    if any(k in T for k in ("gradiente", "divergencia", "rotacional", "laplaciano", "conservativo", "funcion potencial", "trabajo",
+                            "integral de linea", "circulacion", "flujo", "area de la superficie", "area superficial", "area de superficie")) \
+            and not ("∫" in n and re.search(r"∫\s*_", n)):
+        notas = []
+        pl, nt = _vectorial(T, n, texto, ecs, notas)
+        return pl, notas + nt
     opt = any(k in T for k in ("extremo", "maximo", "minimo", "maximiz", "minimiz", "optimiz", "punto critico", "puntos criticos", "lagrange",
                                "mas cercano", "mas lejano", "mas proximo", "distancia minima", "distancia maxima", "mas grande", "punto de silla", "sujetoa"))
     if opt and not hay_integral and not any(k in T for k in ("area de", "centro de masa", "momento de inercia")):
         return _optimizacion(T, texto, ecs)
     if hay_integral or _quantity(T, n) != "integral":
         notas = []
-        plan = _integral(T, n, ecs, notas)
+        try:
+            pd = _plan_desigualdades(texto, ecs, T, n, notas) if not re.search(r"∫\s*_", n) else None
+        except Exception:
+            pd = None
+        if pd is not None:
+            try:
+                n2 = []; viejo = _integral(T, n, ecs, n2)
+                pd.setdefault("alternativas", []).append(viejo)
+            except Exception:
+                pass
+            try:
+                n3 = []; pp = _politopo_plan(texto, n3)
+                if pp is not None: pd["alternativas"].append(pp) if "alternativas" in pd else pd.__setitem__("alternativas", [pp])
+            except Exception:
+                pass
+            return pd, notas
+        notas = []
+        try:
+            plan = _integral(T, n, ecs, notas)
+        except NoReconocido:
+            notas = []
+            pl = _politopo_plan(texto, notas)
+            if pl is None: raise
+            return pl, notas
+        try:
+            n2 = []
+            pl = _politopo_plan(texto, n2)
+        except Exception:
+            pl = None
+        if pl is not None:
+            plan.setdefault("alternativas", []).append(pl)
         return plan, notas
     raise NoReconocido("No reconocí el tipo de ejercicio. Escríbalo como en la guía: la función, la región (curvas o desigualdades) y qué se pide")
 
+
+
+def _contexto_contraste(texto):
+    """argumentos para contraste.esperado (o None si no aplica)"""
+    try:
+        n = normalizar(texto); T = quitar_acentos(n).lower()
+        if re.search(r"∫\s*_", n): return None
+        ecs = leer_ecuaciones(texto); fl = _flags(T)
+        qty = _quantity(T, n)
+        cab, *_ = _region_geom(ecs, n, T)
+        dim = 3 if any("z" in e.simbolos() for e, _ in ecs if e.cabecera is None) else 2
+        f = _integrando_texto(n) or (cab["f"].rhs if "f" in cab else None)
+        delta = cab["delta"].rhs if "delta" in cab else _dens_frase(T, dim)
+        m = re.search(r"\beje\s+([xyz])\b", T)
+        gs = None
+        try:
+            pl = _politopo_plan(texto, [])
+        except Exception:
+            pl = None
+        if pl is not None:
+            vs = pl["variables"]
+            cons = PO.restricciones_desde_textos(pl["restricciones"], vs)
+            gs = [(lambda *p, c=c: float(sum(c[0][v] * p[i] for i, v in enumerate(vs)) + c[1])) for c in cons]
+            dim = len(vs); f = f or pl.get("f")
+            delta = pl.get("delta") if qty in ("masa", "centroide", "inercia") else delta
+        return (ecs, fl, dim, qty, f, delta, m.group(1) if m else None, gs)
+    except Exception:
+        return None
+
+
+def _acotado(cons, vs):
+    """la región {cons ≥ 0} es acotada: cada variable tiene cota inferior y superior tras eliminar las demás"""
+    try:
+        for v in vs:
+            c = [x for x in PO._normaliza(cons)]
+            for w in vs:
+                if w != v: c = PO._normaliza(PO._fm(c, w))
+            if not any(k[0][v] > 0 for k in c) or not any(k[0][v] < 0 for k in c): return False
+        return True
+    except Exception:
+        return False
+
+
+def _politopo_plan(texto, notas):
+    """región lineal (desigualdades, planos, vértices, valor absoluto) → plan «politopo»; None si no es lineal"""
+    n = normalizar(texto); T = quitar_acentos(n).lower()
+    if re.search(r"∫\s*_", n): return None
+    ecs = leer_ecuaciones(texto); fl = _flags(T)
+    qty = _quantity(T, n)
+    if qty == "integral" and not ("DOBLEINT" in n or "TRIPLEINT" in n or "integral" in T): return None
+    cab, cadenas, curvas, simples, vert = _region_geom(ecs, n, T)
+    dim = 3 if any("z" in e.simbolos() for e, _ in ecs if e.cabecera is None) or "solido" in T or "tetraedro" in T or "piramide" in T or TRIPLE(T, n) else 2
+    vs = ["x", "y", "z"][:dim]
+    desig = []
+    for e in cadenas + simples:
+        if e.simbolos() - set(vs): return None
+        desig.append("".join(p + o for p, o in zip(e.mxp, e.ops + [""])))
+    cons = PO.restricciones_desde_textos(desig, vs) if desig else []
+    if cons is None: return None
+    planos = []
+    for e in curvas:
+        if e.simbolos() - set(vs): return None
+        a = PO.afin(f"({e.mxp[0]})-({e.mxp[1]})", vs)
+        if a is None: return None
+        planos.append(a)
+    if "coordenad" in T:
+        for v in vs:
+            planos.append(({w: (F(1) if w == v else F(0)) for w in vs}, F(0)))
+    if fl["cuadrante"] or fl["octante"]:
+        for v in vs: cons.append(({w: (F(1) if w == v else F(0)) for w in vs}, F(0)))
+    if vert and dim == 2:
+        c, _ = _poligono(vert)
+        for cs in c:
+            a = PO.afin(cs.replace("=", "-(") + ")", vs) if cs.startswith("x=") or True else None
+            if a is not None: planos.append(a)
+    if not cons and not planos: return None
+    # celdas del arreglo de planos dentro de las desigualdades
+    celdas = {}
+    import itertools as _it
+    rng = [k * 0.5 for k in range(-16, 17)] + [0.25, 0.75, 1.25, 1.75]
+    pts = list(_it.product(rng, repeat=dim)) if dim == 2 else [p for p in _it.product([k * 0.5 for k in range(-12, 13)] + [0.25, 0.75, 1.25], repeat=3)]
+    def val(a, p): return float(sum(a[0][v] * p[i] for i, v in enumerate(vs)) + a[1])
+    for p in pts:
+        if any(val(c, p) < -1e-12 for c in cons): continue
+        sg = tuple((val(a, p) > 0) - (val(a, p) < 0) for a in planos)
+        if 0 in sg: continue
+        celdas.setdefault(sg, []).append(p)
+    cands = []
+    for sg in celdas:
+        cc = list(cons) + [a if s > 0 else PO._neg(a) for a, s in zip(planos, sg)]
+        if _acotado(cc, vs): cands.append((sg, cc))
+    if not planos and cons and _acotado(cons, vs): cands = [((), list(cons))]
+    if not cands: return None
+    if len(cands) > 1:
+        notas.append(f"Los planos/rectas encierran {len(cands)} regiones acotadas; se usa la que está limitada por todas las curvas dadas (o la de mayor medida)")
+        def _facetas(cc):
+            # planos del enunciado que son frontera real (cara con interior) de la celda
+            k = 0
+            for a, s in zip(planos, sg_of[id(cc)]):
+                otros = [c for c in cc if not (c[0] == (a[0] if s > 0 else PO._neg(a)[0]) and c[1] == (a[1] if s > 0 else PO._neg(a)[1]))]
+                if PO.vertices(cc, vs) and _acotado(otros, vs) is False or len(PO.vertices(otros, vs)) != len(PO.vertices(cc, vs)): k += 1
+            return k
+        sg_of = {id(cc): sg for sg, cc in cands}
+        cands.sort(key=lambda sc: (-_facetas(sc[1]), -_medida_aprox(sc[1], vs)))
+    sg, cc = cands[0]
+    f = _integrando_texto(n) or (cab["f"].rhs if "f" in cab else "1")
+    if qty in ("volumen", "area"): f = "1"
+    delta = cab["delta"].rhs if "delta" in cab else _dens_frase(T, dim)
+    if qty in ("masa", "centroide") and delta is None: delta = "1"
+    if qty == "centroide": delta = "1"
+    m = re.search(r"\beje\s+([xyz])\b", T)
+    cons_txt = [PO._afin_str(a, vs) + ">=0" for a in PO._normaliza(cc)]
+    notas.append("Región lineal (politopo): " + "; ".join(cons_txt) + ". Se parte en piezas con límites afines y se integra exactamente.")
+    return {"tipo": "politopo", "variables": vs, "restricciones": cons_txt, "f": f, "que": qty, "delta": delta or "1", "eje": m.group(1) if m else None}
+
+
+def TRIPLE(T, n): return "TRIPLEINT" in n or "integral triple" in T
+
+
+def _medida_aprox(cons, vs):
+    ev = [(lambda p, c=c: float(sum(c[0][v] * p[i] for i, v in enumerate(vs)) + c[1])) for c in cons]
+    caja = CT._caja(ev, len(vs))
+    if caja is None: return 0
+    N = 6000; vol = 1.0
+    for a, b in caja: vol *= (b - a)
+    k = sum(1 for p in CT._pts(N, caja) if all(g(p) >= -1e-12 for g in ev))
+    return vol * k / N
+
+
+def _cerrar_cuadrica(ecs, T):
+    """una única ecuación que es una cuádrica cerrada (elipse/elipsoide/esfera) → la región que encierra (≤)"""
+    ig = [(e, s) for e, s in ecs if e.cabecera is None and e.es_igualdad]
+    if len(ig) != 1: return ecs
+    e0 = ig[0][0]
+    try:
+        dim = 3 if "z" in e0.simbolos() else 2
+        if e0.simbolos() - {"x", "y", "z"}: return ecs
+        g = _g(e0, ("x", "y", "z") if dim == 3 else ("x", "y"))
+        if dim == 3:
+            c = _ajustar(g, _B3, 3)
+            ok = c is not None and max(abs(v) for v in c[3:9]) < 1e-9 and c[0] * c[1] > 0 and c[1] * c[2] > 0 and c[0] * c[9] < 0 if c is not None else False
+        else:
+            c = _ajustar(g, _B2, 2)
+            if c is None: return ecs
+            a, b, cxy, d, ee, f0 = c
+            r = f0 - (d * d / (4 * a) + ee * ee / (4 * b)) if abs(a) > 1e-12 and abs(b) > 1e-12 else 1
+            ok = abs(cxy) < 1e-9 and a * b > 0 and a * r < 0
+    except Exception:
+        return ecs
+    if not ok: return ecs
+    nuevo = []
+    for e, s in ecs:
+        if e is e0: nuevo.append((Ec(f"({e0.mxp[0]})<=({e0.mxp[1]})"), s))
+        else: nuevo.append((e, s))
+    return nuevo
+
+
+def _plan_desigualdades(texto, ecs, T, n, notas, f_forzada=None, qty_forzada=None):
+    """región dada SOLO por desigualdades y que es una caja en polares/cilíndricas/esféricas → plan «coordenadas» con límites exactos"""
+    from . import coordscan as CS
+    fl = _flags(T)
+    qty = qty_forzada or _quantity(T, n)
+    ecs = _cerrar_cuadrica(ecs, T)
+    cab, *_ = _region_geom(ecs, n, T)
+    dim = 3 if any("z" in e.simbolos() for e, _ in ecs if e.cabecera is None) else 2
+    gs = CT.desigualdades(ecs, fl, dim)
+    if gs is None: return None
+    r = CS.deducir(gs, dim)
+    esc = None
+    if r is None:
+        esc = CS.deducir_escalado(gs, dim)
+        if esc is None: return None
+        r = (esc[0], esc[1])
+    sis, niv = r
+    f = f_forzada or _integrando_texto(n) or (cab["f"].rhs if "f" in cab else None)
+    delta = cab["delta"].rhs if "delta" in cab else _dens_frase(T, dim)
+    m = re.search(r"\beje\s+([xyz])\b", T)
+    if esc is not None:
+        _, niv_s, cen, sem = esc
+        vs = ["x", "y", "z"][:dim]
+        ren = {"z": "w"}
+        niv2 = [[ren.get(a, a), b, c] for a, b, c in niv_s]
+        if sis == "polares":
+            mapa = {"x": f"({cen[0]})+({sem[0]})*r*cos(theta)", "y": f"({cen[1]})+({sem[1]})*r*sin(theta)"}; nuevas = ["r", "theta"]
+        elif sis == "cilindricas":
+            mapa = {"x": f"({cen[0]})+({sem[0]})*r*cos(theta)", "y": f"({cen[1]})+({sem[1]})*r*sin(theta)", "z": f"({cen[2]})+({sem[2]})*w"}; nuevas = ["r", "theta", "w"]
+        else:
+            mapa = {"x": f"({cen[0]})+({sem[0]})*rho*sin(phi)*cos(theta)", "y": f"({cen[1]})+({sem[1]})*rho*sin(phi)*sin(theta)", "z": f"({cen[2]})+({sem[2]})*rho*cos(phi)"}
+            nuevas = ["rho", "phi", "theta"]
+        if qty in ("area", "volumen"): fx = "1"
+        elif qty == "integral": fx = f or "1"
+        elif qty == "inercia":
+            d = delta or "1"; eje = m.group(1) if m else "z"
+            fx = f"({d})*(" + {"x": "y^2+z^2", "y": "x^2+z^2", "z": "x^2+y^2"}[eje] + ")"
+            if dim == 2: fx = f"({d})*(" + {"x": "y^2", "y": "x^2", "z": "x^2+y^2"}[eje] + ")"
+        else: return None
+        notas.append("Región elíptica/desplazada: se traslada y escala (" + ", ".join(f"{v} = {mapa[v]}" for v in vs) + f") y es una caja en coordenadas {sis}: " + ", ".join(f"{a} de {b} a {c}" for a, b, c in niv2))
+        return {"tipo": "cambio_variables_3d", "f": fx, "viejas": vs, "nuevas": nuevas, "mapa": mapa, "modo": "directo", "niveles": niv2}
+    plan = {"tipo": "coordenadas", "sistema": sis, "niveles": niv if sis != "esfericas" else niv}
+    if qty in ("area", "volumen"): plan["f"] = "1"
+    elif qty == "integral": plan["f"] = f or "1"
+    elif qty in ("masa", "centroide"):
+        plan["delta"] = "1" if qty == "centroide" else (delta or "1")
+        plan["que"] = "masa2d" if dim == 2 else "masa3d"
+    elif qty == "inercia":
+        eje = m.group(1) if m else "z"
+        d = delta or "1"
+        if dim == 2:
+            suma = {"x": "y^2", "y": "x^2", "z": "x^2+y^2"}[eje]
+            plan["f"] = f"({d})*({suma})"
+        else:
+            plan.update({"que": "inercia", "delta": d, "eje": eje})
+    notas.append(f"Región escrita con desigualdades: es una caja en coordenadas {sis}: " + ", ".join(f"{a} de {b} a {c}" for a, b, c in niv))
+    return plan
+
+
+# ------------------------------------------------------------------------------------------------ cálculo vectorial
+def _parte_balanceada(s, i):
+    """s[i] es un paréntesis/ángulo de apertura → (contenido, índice siguiente)"""
+    par = {"(": ")", "<": ">", "[": "]"}
+    ab = s[i]; ce = par[ab]; prof = 0
+    for j in range(i, len(s)):
+        if s[j] in "([<" and (s[j] == ab or s[j] != "<"): prof += 1
+        elif s[j] in ")]>" and (s[j] == ce or s[j] != ">"): prof -= 1
+        if prof == 0: return s[i + 1:j], j + 1
+    return s[i + 1:], len(s)
+
+
+def _comas_nivel0(s):
+    out = []; prof = 0; cur = ""
+    for ch in s:
+        if ch in "([": prof += 1
+        elif ch in ")]": prof -= 1
+        if ch == "," and prof == 0: out.append(cur); cur = ""
+        else: cur += ch
+    out.append(cur)
+    return [c.strip() for c in out if c.strip()]
+
+
+def _campo(n, nombres="FGHVEB"):
+    """campo vectorial F = (P, Q[, R]) o F = P i + Q j + R k → (nombre, [componentes en sintaxis del motor]) o None"""
+    n = n.replace("⟨", "(").replace("⟩", ")").replace("〈", "(").replace("〉", ")")
+    m = re.search(r"(?<![A-Za-z])([%s])\s*(?:\([^)=]*\))?\s*=\s*" % nombres, n)
+    if not m: return None
+    i = m.end()
+    if i < len(n) and n[i] in "(<[":
+        cont, _ = _parte_balanceada(n, i)
+        cs = _comas_nivel0(cont)
+        if len(cs) in (2, 3): return m.group(1), [mx(c) for c in cs]
+    resto = re.split(r"(?:\.\s|\n|;|\s+(?:en|a lo largo|sobre|donde|sobre|para|calcul)\b)", n[i:], maxsplit=1)[0]
+    partes = re.split(r"(?<![A-Za-z0-9_])\*?\s*([ijk])(?![A-Za-z0-9_(])|(?<=[0-9)\^a-z])\s*([ijk])(?![A-Za-z0-9_(])", resto)
+    comp = {}
+    buf = ""
+    toks = re.findall(r"(.+?)\s*\*?\s*(?<![A-Za-z])([ijk])(?![A-Za-z0-9_(])", resto)
+    for expr, c in toks:
+        expr = expr.strip().lstrip("+").strip()
+        if expr in ("", "+"): expr = "1"
+        if expr == "-": expr = "-1"
+        comp[c] = comp.get(c, "") + (("+" if comp.get(c) and not expr.startswith("-") else "") + mx(expr))
+    if comp and set(comp) <= set("ijk"):
+        ks = "ijk"[:3 if "k" in comp else 2]
+        return m.group(1), [comp.get(k, "0") for k in ks]
+    return None
+
+
+def _curva_param(T, n, ecs, comps, notas):
+    pts = _pares_puntos(n)
+    # r(t) = (…) explícita
+    m = re.search(r"\br\s*\(\s*t\s*\)\s*=\s*", n)
+    if m and m.end() < len(n) and n[m.end()] in "(<[":
+        cont, j = _parte_balanceada(n, m.end())
+        cs = [mx(c) for c in _comas_nivel0(cont)]
+        resto = n[j:]
+        mi = re.search(r"(-?[\w./^*()\-]+?)\s*(?:<=|≤|\\leq)\s*t\s*(?:<=|≤)\s*([\w./^*()\-]+)", resto) or \
+              re.search(r"t\s*(?:de|desde)\s*(-?[\w./^*()]+)\s*(?:a|hasta)\s*([\w./^*()]+)", resto)
+        if not mi: raise NoReconocido("Indique el intervalo del parámetro, p. ej. 0 ≤ t ≤ 2π")
+        a, b = mx(mi.group(1)), mx(mi.group(2))
+        cv = {v: c for v, c in zip("xyz", cs)}; cv["t"] = [a, b]
+        notas.append("Curva dada en forma paramétrica r(t)")
+        return cv, None
+    curvas = [e for e, _ in ecs if e.es_igualdad and e.cabecera is None and e.lhs not in ("F", "f") and not (e.simbolos() <= {"t"})]
+    ex_circ = None
+    for e in curvas:
+        if "z" in e.simbolos(): continue
+        cl = clase_curva(e)
+        if cl[0] == "circulo":
+            _, cx, cy, r2 = cl
+            R = _txt_raiz(r2); horario = "horario" in T and "antihorario" not in T and "contrario" not in T
+            cxs, cys = _fmt(cx), _fmt(cy)
+            t0, t1 = ("2*pi", "0") if horario else ("0", "2*pi")
+            cv = {"x": f"({cxs})+({R})*cos(t)", "y": f"({cys})+({R})*sin(t)", "t": [t0, t1]}
+            notas.append(f"Circunferencia con centro ({cxs}, {cys}) y radio {R}, recorrida en sentido {'horario' if horario else 'antihorario'} (si no se indica, se toma el antihorario, orientación positiva)")
+            green = {"cx": cxs, "cy": cys, "R": R, "signo": -1 if horario else 1}
+            return cv, green
+    # curva explícita y = g(x) o x = g(y)
+    for e in curvas:
+        if e.lhs in ("y", "x") and e.lhs not in _syms(e.rhs) and not ("z" in e.simbolos()):
+            v = e.lhs; o = "x" if v == "y" else "y"
+            if len(pts) >= 2:
+                a, b = pts[0][0 if v == "y" else 1], pts[-1][0 if v == "y" else 1]
+            else:
+                mr = re.search(r"%s\s*(?:de|desde)\s*(?:%s\s*=\s*)?(-?[\w./]+)\s*(?:a|hasta)\s*(?:%s\s*=\s*)?(-?[\w./]+)" % (o, o, o), T)
+                if not mr: continue
+                a, b = mx(mr.group(1)), mx(mr.group(2))
+            cv = {o: "t", v: e.rhs.replace(o, "(t)"), "t": [str(a), str(b)]}
+            notas.append(f"Curva {e.crudo}: se parametriza con {o} = t, t de {a} a {b}")
+            return cv, None
+    # segmento entre dos puntos
+    if len(pts) >= 2 and any(k in T for k in ("segmento", "recta", "linea recta", "de (", "desde")):
+        A, B = pts[0], pts[-1]
+        cv = {v: f"({a})+t*(({b})-({a}))" for v, a, b in zip("xyz", A, B)}; cv["t"] = ["0", "1"]
+        notas.append(f"Segmento de {tuple(A)} a {tuple(B)}: r(t) = A + t(B − A), t de 0 a 1")
+        return cv, None
+    raise NoReconocido("No pude determinar la curva: dé r(t) = (…) con su intervalo, una circunferencia, y = g(x) con los extremos, o dos puntos (segmento)")
+
+
+def _sup_area(T, n, ecs, notas):
+    """área de la superficie z = f(x,y): ∬_D sqrt(1 + f_x² + f_y²) dA; D se deduce de las demás condiciones"""
+    from . import vectorial as VE
+    sup = None; otros = []
+    for e, sc in ecs:
+        if e.cabecera is not None: continue
+        if e.es_igualdad and e.lhs == "z" and "z" not in _syms(e.rhs) and sup is None: sup = e.rhs
+        elif e.es_igualdad and e.rhs == "z" and "z" not in _syms(e.lhs) and sup is None: sup = e.lhs
+        else: otros.append(e)
+    if sup is None: raise NoReconocido("Escriba la superficie como z = f(x, y)")
+    fx, fy = VE.derivar(sup, "x").to_str(), VE.derivar(sup, "y").to_str()
+    integrando = f"sqrt(1+({fx})^2+({fy})^2)"
+    desig = []
+    below = any(k in T for k in ("bajo", "debajo", "por debajo", "menor", "inferior"))
+    for e in otros:
+        if not e.es_igualdad: desig.append(e); continue
+        s = e.simbolos()
+        if s == {"z"} or (s <= {"z"}):
+            c = e.rhs if e.lhs == "z" else e.lhs
+            # z = c: region f(x,y) ≤ c (bajo el plano) o ≥ c (sobre)
+            sentido = "<=" if (below or "sobre" not in T) else ">="
+            desig.append(Ec(f"({sup}){sentido}({c})"))
+        elif "z" not in s:
+            cl = e.como_curva(); a, b = e.mxp[0], e.mxp[1]
+            desig.append(Ec(f"({a})<=({b})"))                 # dentro del cilindro / curva cerrada
+    if "plano xy" in T and not any("z" in str(d.crudo) for d in desig):
+        desig.append(Ec(f"({sup})>=0"))
+    if not desig: raise NoReconocido("Indique la región D del plano xy (o un plano z = c que corte la superficie)")
+    ecs2 = [(d, 0) for d in desig]
+    fl = _flags(T)
+    plan = None
+    try:
+        plan = _plan_desigualdades("", ecs2, T, n, notas, f_forzada=integrando, qty_forzada="integral")
+    except Exception:
+        plan = None
+    if plan is None:
+        try:
+            plan = _plan_desigualdades("", [(Ec(f"({a.partes[1]})>=0") if False else d, 0) for d in desig], T, n, notas, f_forzada=integrando, qty_forzada="integral")
+        except Exception:
+            plan = None
+    if plan is None: raise NoReconocido("No pude describir la región D en polares ni como caja; escriba la integral con límites")
+    notas.append(f"Área de superficie: A = ∬_D √(1 + (∂z/∂x)² + (∂z/∂y)²) dA con z = {sup}, ∂z/∂x = {fx}, ∂z/∂y = {fy}")
+    return plan
+
+
+def _vectorial(T, n, texto, ecs, notas):
+    if "area de la superficie" in T or "area superficial" in T or "area de superficie" in T:
+        return _sup_area(T, n, ecs, notas), []
+    cf = _campo(n)
+    cab = {e.cabecera[0]: e for e, _ in ecs if e.cabecera is not None}
+    esc = None
+    for nm in ("f", "g", "phi", "u"):
+        if nm in cab and cf is None: esc = (nm, cab[nm].rhs, cab[nm].cabecera[1]); break
+    if esc is None and cf is None:
+        for e, _ in ecs:
+            if e.es_igualdad and e.lhs in ("f", "g") : esc = (e.lhs, e.rhs, None); break
+    if "gradiente" in T and esc:
+        vs = esc[2] or sorted(_syms(esc[1]) & COORD) or ["x", "y"]
+        return {"tipo": "vectorial", "op": "gradiente", "f": esc[1], "variables": vs}, ["Gradiente de f = " + esc[1]]
+    if "laplaciano" in T and esc:
+        vs = esc[2] or sorted(_syms(esc[1]) & COORD) or ["x", "y"]
+        return {"tipo": "vectorial", "op": "laplaciano", "f": esc[1], "variables": vs}, ["Laplaciano de f = " + esc[1]]
+    if cf is None: raise NoReconocido("No encontré el campo vectorial; escríbalo como F = (P, Q, R) o F = P i + Q j + R k")
+    nm, comps = cf
+    vs = ["x", "y", "z"][:len(comps)]
+    base = {"tipo": "vectorial", "campo": comps, "variables": vs}
+    nota = f"Campo {nm} = ({', '.join(comps)})"
+    if "divergencia" in T and "flujo" not in T: return dict(base, op="divergencia"), [nota]
+    if "rotacional" in T: return dict(base, op="rotacional"), [nota]
+    if any(k in T for k in ("conservativo", "funcion potencial", "potencial")) and not any(k in T for k in ("trabajo", "integral de linea")):
+        return dict(base, op="conservativo"), [nota]
+    if any(k in T for k in ("trabajo", "integral de linea", "circulacion", "a lo largo")):
+        nn = []
+        cv, green = _curva_param(T, n, ecs, comps, nn)
+        pl = dict(base, op="linea", curva=cv)
+        if green and len(comps) == 2: pl["green"] = green
+        return pl, [nota] + nn
+    if "flujo" in T:
+        # teorema de la divergencia para superficies cerradas: ∬ F·n dS = ∭ div F dV
+        from . import vectorial as VE
+        div = None
+        for k, (c, v) in enumerate(zip(comps, vs)):
+            d = VE.derivar(c, v); div = d if div is None else div + d
+        ecs3 = []
+        for e, sc in ecs:
+            if e.cabecera is not None or "z" not in e.simbolos() and e.es_igualdad and False: continue
+            if e.es_igualdad and e.lhs == nm: continue
+            if e.es_igualdad and clase_superficie_segura(e) == "esfera":
+                ecs3.append((Ec(f"({e.mxp[0]})<=({e.mxp[1]})"), 0))
+            elif not e.es_igualdad: ecs3.append((e, sc))
+        if not ecs3: raise NoReconocido("Para el flujo describa el sólido cerrado (esfera, caja con desigualdades…)")
+        nn = [f"Flujo a través de una superficie cerrada: teorema de la divergencia, ∬ F·n dS = ∭ div F dV con div F = {div.to_str()}"]
+        plan = _plan_desigualdades(texto, ecs3, T, n, nn, f_forzada=div.to_str(), qty_forzada="integral")
+        if plan is None:
+            pol = None
+            try: pol = _politopo_plan_desde(ecs3, T, n, nn, div.to_str())
+            except Exception: pol = None
+            plan = pol
+        if plan is None: raise NoReconocido("No pude describir el sólido del flujo")
+        return plan, [nota] + nn
+    raise NoReconocido("No reconocí qué se pide del campo vectorial (divergencia, rotacional, conservativo/potencial, trabajo, flujo)")
+
+
+def clase_superficie_segura(e):
+    try: return clase_superficie(e)[0]
+    except Exception: return "otra"
+
+
+def _politopo_plan_desde(ecs3, T, n, notas, f):
+    desig = []
+    vs = ["x", "y", "z"]
+    for e, _ in ecs3:
+        desig.append("".join(p + o for p, o in zip(e.mxp, e.ops + [""])))
+    cons = PO.restricciones_desde_textos(desig, vs)
+    if cons is None or not _acotado(cons, vs): return None
+    cons_txt = [PO._afin_str(a, vs) + ">=0" for a in PO._normaliza(cons)]
+    return {"tipo": "politopo", "variables": vs, "restricciones": cons_txt, "f": f, "que": "integral", "delta": "1", "eje": None}
 
 
 def resolver(texto, req, st):
@@ -1177,7 +1654,14 @@ def resolver(texto, req, st):
         candidatos.append(p0)
         if "orden" in p0 and p0["tipo"] in ("cambio_variables", "cambio_variables_masa", "region", "triple_region"):
             candidatos.append(dict(p0, orden="dxdy" if p0["orden"] == "dydx" else "dydx"))
-    mejor = None; ultimo_error = None
+    mejor = None; ultimo_error = None; rechazados = []
+    ctx = _contexto_contraste(texto)
+    esp_cache = []
+    def _esperado():
+        if not esp_cache:
+            try: esp_cache.append(CT.esperado(*ctx) if ctx else None)
+            except Exception: esp_cache.append(None)
+        return esp_cache[0]
     for p in candidatos:
         try:
             r = api3._run(p["tipo"], dict(p), req, st)
@@ -1201,11 +1685,40 @@ def resolver(texto, req, st):
                         r2 = "ok"; break
                     r2 = None
                 if r2 == "ok": break
+        esp = _esperado()
+        if esp is not None:
+            ok = CT.coincide(esp, f"{r.get('exact_result')} {r.get('approximate_result')}")
+            if ok is False:
+                rechazados.append((p, esp)); continue
+            if ok:
+                r.setdefault("steps", []).append({"text": "Contraste independiente con el enunciado (cuasi-Monte Carlo directo sobre las desigualdades): esperado ≈ " + ", ".join("%.4g" % v for v in esp) + " — coincide."})
         if r.get("status") == "success_exact": mejor = (p, r); break
         if mejor is None: mejor = (p, r)
+    if mejor is None and rechazados:
+        from ..errors import VerificationFailed
+        raise VerificationFailed("El planteamiento no coincide con un contraste independiente hecho directamente sobre el enunciado "
+                                 "(posible restricción ignorada o región mal interpretada); no se entrega el resultado.",
+                                 {"esperado_aprox": rechazados[0][1], "planteamiento": rechazados[0][0]})
     if mejor is None:
         raise ultimo_error if ultimo_error else NoReconocido("No pude resolver el enunciado")
     p, r = mejor
+    if p.get("distancia") and r.get("data", {}).get("puntos"):
+        from .cas3 import from_ast as _fa
+        lin = []; dmin = None
+        for pt in r["data"]["puntos"]:
+            try:
+                d = _fa(normalize(parse(f"sqrt({pt['valor']})")))
+                dv = math.sqrt(float(pt["valor_aprox"]) if pt.get("valor_aprox") is not None else float(_fa(normalize(parse(pt['valor']))).eval({})))
+            except Exception:
+                continue
+            cl = pt.get("clase") or ""
+            etq = "mínima" if "mín" in cl else ("máxima" if "máx" in cl else "")
+            lin.append(f"Distancia {etq} = {d.to_str()} ≈ {dv:.10g}  en P({', '.join(pt['coordenadas'])})".replace("  ", " "))
+            if "mín" in cl and (dmin is None or dv < dmin): dmin = dv
+        if lin:
+            r["exact_result"] = (r.get("exact_result") or "") + "\n" + "\n".join(lin)
+            r["approximate_result"] = f"{dmin:.10g}" if dmin is not None else r.get("approximate_result")
+            r.setdefault("steps", []).append({"text": "El valor de f es el cuadrado de la distancia: se extrae la raíz cuadrada. " + "; ".join(lin)})
     pasos = [{"text": "Interpretación del enunciado", "latex": None}]
     pasos[0]["text"] = "Interpretación del enunciado: " + " ".join(notas) if notas else "Interpretación del enunciado"
     pasos.append({"text": f"Tipo de ejercicio reconocido: {p['tipo']}"})

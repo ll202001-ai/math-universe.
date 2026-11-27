@@ -113,3 +113,7 @@ Todas devuelven `verification.status = passed` solo si la comprobación independ
 | `implicit_diff` | `expression` = ecuación en x, y | `x^2+y^2=1` → `-x/y` | coincide con −F_x/F_y (teorema de la función implícita, vía distinta de idiff) |
 Funciones añadidas al parser: `%` (postfijo, /100), `log(x,b)`, `cbrt`, `root(x,n)`, `sec csc cot`, `asinh acosh atanh`,
 `gamma erf erfc beta zeta besselj floor ceil`. `evaluate` usa SymPy como respaldo verificado; `zoo`/`nan`/`oo` → `domain_error`.
+
+## Operación `resolver`
+
+Entrada: `{"operation":"resolver","expression":"<enunciado en texto libre>","latex":true,"steps":true,"timeout_ms":60000}`. Salida: la respuesta estándar (`status`, `exact_result`, `approximate_result`, `steps`, `verification`, `warnings`). El primer paso es «Interpretación: …» con lo que el motor entendió; si no se reconoce, `status: unsupported` y la lista de intentos.

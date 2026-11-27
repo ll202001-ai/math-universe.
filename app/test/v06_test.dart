@@ -75,6 +75,8 @@ void main() {
     });
     await t.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await t.pumpAndSettle();
+    await t.tap(find.text('Calculadora'));
+    await t.pumpAndSettle();
     await t.enterText(find.byKey(const Key('campo_expresion')), 'deriva x al cubo por seno de x');
     await t.pump();
     await t.tap(find.byKey(const Key('boton_calcular')));
@@ -93,6 +95,8 @@ void main() {
     await _big(t);
     final eng = FakeEngine((req) => okResponse('ok'));
     await t.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Calculadora'));
     await t.pumpAndSettle();
     await t.ensureVisible(find.byKey(const Key('cat_Ecuaciones diferenciales')));
     await t.pumpAndSettle();

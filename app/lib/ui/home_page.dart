@@ -12,6 +12,7 @@ import 'mat3_page.dart';
 import 'graph_page.dart';
 import 'history_page.dart';
 import 'matrix_page.dart';
+import 'universal_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.engine, required this.store, this.storeWarning, this.openStore, this.settings});
@@ -74,6 +75,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
+      UniversalPage(engine: widget.engine, store: widget.store),
       CalculatorPage(key: _calcKey, engine: widget.engine, store: widget.store, initialExpression: _reuseExpr, initialOperation: _reuseOp),
       GraphPage(engine: widget.engine),
       MatrixPage(engine: widget.engine, store: widget.store),
@@ -88,7 +90,7 @@ class _HomePageState extends State<HomePage> {
                 _reuseExpr = e.input;
                 _reuseOp = calculusKnown(e.operation) ? e.operation : null;
                 _calcKey = UniqueKey();
-                _tab = 0;
+                _tab = 1;
               });
             }
           }),
@@ -97,9 +99,10 @@ class _HomePageState extends State<HomePage> {
     final cs = Theme.of(context).colorScheme;
     void select(int i) => setState(() {
           _tab = i;
-          if (i == 5) _histKey = UniqueKey(); // recarga el historial al entrar
+          if (i == 6) _histKey = UniqueKey(); // recarga el historial al entrar
         });
     const destinations = [
+      (Icons.auto_awesome, 'Resolver'),
       (Icons.functions, 'Calculadora'),
       (Icons.show_chart, 'Gráficas'),
       (Icons.grid_on, 'Matrices'),

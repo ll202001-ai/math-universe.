@@ -50,6 +50,10 @@ def normalizar(t):
     t = re.sub(r"√\s*\(", "sqrt(", t)
     t = re.sub(r"√\s*([A-Za-z0-9_.]+)", r"sqrt(\1)", t)
     t = t.replace("√", "sqrt")
+    prev = None
+    while prev != t:                         # |expr| → abs(expr)
+        prev = t
+        t = re.sub(r"\|([^|]+)\|", r"abs(\1)", t)
     return t
 
 
@@ -251,7 +255,14 @@ def _separar_conjunciones(toks):
             sig = toks[i + 1] if i + 1 < n else None
             # buscar el siguiente token significativo
             conj = False
-            if _fin_operando(prev):
+            if prev is not None and prev[0] == "text" and sig is not None and _ini_operando(sig) and sig[1] not in _REL:
+                # «… coordenados y x+y+z=1»: tras una palabra, «y» seguida de un operando y de una relación posterior es conjunción
+                k = i + 1; tiene_rel = False
+                while k < n and toks[k][0] not in ("sep", "text"):
+                    if toks[k][1] in _REL: tiene_rel = True; break
+                    k += 1
+                conj = tiene_rel
+            elif _fin_operando(prev):
                 if sig is not None and sig[0] == "text": conj = True
                 elif sig is not None and _ini_operando(sig):
                     # ¿hay una relación después, y ya hubo una antes en este tramo?

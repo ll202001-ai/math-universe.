@@ -574,6 +574,10 @@ def _dispatch(req, st):
     if op == "capabilities": return {"data": capabilities()}
     if op == "determinant" or op in MATRIX_OPS:
         return op_matrix(req, st)
+    if op == "resolver":
+        from . import universal
+        remaining = max(30.0, limits._deadline - time.perf_counter()) if limits._deadline else 60
+        return limits.run_in_thread(universal.resolver, (req, st), remaining)
     if op == "calc3":
         remaining = max(30.0, limits._deadline - time.perf_counter()) if limits._deadline else 60
         out = limits.run_in_thread(CALC3.run, (req, st), remaining)
@@ -691,7 +695,7 @@ def handle(req):
 
 
 _CON_RESULTADO = {"success_exact", "success_approximate", "multiple_solutions", "no_solution"}
-_SIN_LATEX_DE_ENTRADA = {"units", "stats", "formula", "formulas", "interpret", "ode", "inequality", "plot", "plot3d",
+_SIN_LATEX_DE_ENTRADA = {"resolver", "calc3", "units", "stats", "formula", "formulas", "interpret", "ode", "inequality", "plot", "plot3d",
                          "parametric", "polar", "capabilities", "ping"}
 
 

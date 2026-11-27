@@ -65,7 +65,8 @@
         "logic",
         "sets",
         "implicit_diff",
-        "calc3"
+        "calc3",
+        "resolver"
       ]
     },
     "expression": {

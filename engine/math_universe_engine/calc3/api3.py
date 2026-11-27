@@ -54,7 +54,7 @@ def _fin(res, metodo):
 def run(req, st):
     p = dict(req.get("params") or {})
     tipo = p.get("tipo")
-    if tipo not in ("suma", "auto", "cambio_variables_masa") and tipo not in TIPOS: raise InvalidRequest("params.tipo debe ser uno de: " + ", ".join(TIPOS))
+    if tipo not in ("suma", "auto", "cambio_variables_masa", "politopo", "vectorial", "superficie") and tipo not in TIPOS: raise InvalidRequest("params.tipo debe ser uno de: " + ", ".join(TIPOS))
     try:
         return _run(tipo, p, req, st)
     except NoSoportado as e:
@@ -87,7 +87,58 @@ def _suma(p, req, st):
             "steps": pasos, "data": {"partes": len(partes)}}
 
 
+def _politopo(p):
+    """integrales / áreas / volúmenes / masas / centroides / inercias sobre una región lineal (politopo), exactos"""
+    from . import politopo as PO
+    vs = list(p.get("variables") or ["x", "y"])
+    cons = PO.restricciones_desde_textos(_req(p, "restricciones"), vs)
+    if cons is None: raise InvalidRequest("Las restricciones deben ser lineales")
+    que = p.get("que", "integral"); orden = list(p.get("orden") or vs)
+    delta = p.get("delta") or "1"
+    def uno(f, nom):
+        r = PO.integrar_politopo(cons, orden, f, nombre=nom)
+        if r["verificacion"] == "failed": raise VerificationFailed("La verificación independiente falló", {"integral": nom})
+        return r
+    def ex(r): return r["exacto"]
+    pasos = []
+    def reg(r, rot):
+        pasos.extend(dict(x, text=f"[{rot}] " + x["text"]) for x in r["pasos"])
+    if que in ("masa", "centroide"):
+        m = uno(f"({delta})", "m"); reg(m, "masa")
+        ms = []
+        for v in vs:
+            r = uno(f"({delta})*({v})", "M_" + v); reg(r, f"momento respecto a {v}"); ms.append(r)
+        cs = [(AP._cociente(r["exacto"], m["exacto"]), r["aprox"] / m["aprox"]) for r in ms]
+        ver = "passed" if all(r["verificacion"] == "passed" for r in [m] + ms) else "not_possible"
+        def s_(c, a): return c.to_str() if c is not None else _fmt_num(a)
+        pasos.append({"text": "Coordenadas del centro de masa (momento / masa)", "latex": None})
+        return {"status": "success_exact", "exact_result": f"m = {m['exacto'].to_str()}; centro de masa = (" + ", ".join(s_(c, a) for c, a in cs) + ")",
+                "approximate_result": f"m ≈ {_fmt_num(m['aprox'])}; centro ≈ (" + ", ".join(_fmt_num(a) for _, a in cs) + ")",
+                "method": "politopo_masa_y_centro", "verification": {"status": ver, "method": "cuadratura numérica independiente de cada pieza"},
+                "steps": pasos, "data": {"m": m["aprox"], "centro": [a for _, a in cs], "piezas": m["piezas"]}}
+    if que == "inercia":
+        eje = p.get("eje") or ("z" if len(vs) == 2 else None)
+        if eje is None: raise InvalidRequest("Indique el eje respecto al cual se calcula el momento de inercia")
+        otros = [v for v in vs if v != eje] if eje in vs else vs
+        r = uno(f"({delta})*(" + "+".join(f"{v}^2" for v in otros) + ")", "I_" + eje); reg(r, "inercia")
+        f = None
+    else:
+        f = p.get("f") or "1"
+        if que in ("area", "volumen"): f = "1"
+        r = uno(f, "V" if f == "1" else "I"); reg(r, "integral")
+    out = {"status": "success_exact", "exact_result": r["exacto"].to_str(), "approximate_result": _fmt_num(r["aprox"]),
+           "latex": {"result": r["exacto"].to_str(True)}, "method": "politopo_integral_exacta",
+           "verification": {"status": r["verificacion"], "method": "cuadratura numérica independiente de cada pieza"},
+           "steps": pasos, "data": {"piezas": r["piezas"]}}
+    return out
+
+
 def _run(tipo, p, req, st):
+    if tipo == "politopo":
+        return _politopo(p)
+    if tipo == "vectorial":
+        from . import vectorial
+        return vectorial.run(p)
     if tipo == "auto":
         from . import enunciado
         return enunciado.resolver(_req(p, "texto"), req, st)
@@ -135,6 +186,8 @@ def _run(tipo, p, req, st):
         sis = _req(p, "sistema")
         if sis not in CO.SIS: raise InvalidRequest("sistema: polares, cilindricas o esfericas")
         niv = [(str(a), str(b), str(c)) for a, b, c in _req(p, "niveles")]
+        if p.get("que") == "masa2d":
+            return _masa2d(lambda f, nom: CO.integral(f, sis, niv, nombre=nom), p)
         if p.get("que", "integral") in ("masa3d", "inercia"):
             return _solido(lambda f, nom: CO.integral(f, sis, niv, nombre=nom), p)
         return _fin(CO.integral(p.get("f", "1"), sis, niv), "coordenadas_" + sis)
@@ -219,6 +272,14 @@ def _fin_masa(r):
            "method": "masa_y_centro_de_masa", "verification": {"status": ver, "method": "cuadratura numérica independiente (tanh-sinh anidada)"},
            "steps": pasos, "data": {"m": m["aprox"], "My": My["aprox"], "Mx": Mx["aprox"], "xbar": r["xbar_aprox"], "ybar": r["ybar_aprox"]}}
     return out
+
+
+def _masa2d(run1, p):
+    d = p.get("delta", "1")
+    m, My, Mx = run1(f"({d})", "m"), run1(f"({d})*(x)", "M_y"), run1(f"({d})*(y)", "M_x")
+    xb = AP._cociente(My["exacto"], m["exacto"]) if m["exacto"] is not None and My["exacto"] is not None else None
+    yb = AP._cociente(Mx["exacto"], m["exacto"]) if m["exacto"] is not None and Mx["exacto"] is not None else None
+    return _fin_masa({"m": m, "My": My, "Mx": Mx, "xbar": xb, "ybar": yb, "xbar_aprox": My["aprox"] / m["aprox"], "ybar_aprox": Mx["aprox"] / m["aprox"]})
 
 
 def _solido(run1, p):

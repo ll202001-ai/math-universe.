@@ -81,3 +81,18 @@ Límites conocidos:
 - `x^2/2y` es ambiguo; escriba paréntesis. Al copiar desde PDF se pierden a veces los superíndices («4𝑥2»): revíselos.
 - No cubre aún: integrales de superficie y campos vectoriales; suma de integrales a una sola; planteo sin evaluar (escribir la integral con ambos órdenes); las otras cinco permutaciones de una integral triple; sólidos con 3 o más superficies superiores que requieran dividirse (use «Sólido en dos piezas»); problemas de palabras sin formulación matemática.
 - Si el enunciado deja varias regiones cerradas posibles se toma la del primer cuadrante y se avisa en las advertencias.
+
+## Entrada universal (`resolver`) y arquitectura de verificación
+
+Pestaña «Resolver» (primera de la app): un único campo de texto libre. Flujo: normalización → intención (derivada, integral, límite, ecuación, EDO, matrices, estadística, unidades, cálculo multivariable/vectorial…) → motor exacto (SymPy / CAS propio `calc3`) → métodos numéricos de respaldo → verificación independiente → presentación con pasos.
+
+Verificaciones independientes realizadas hoy:
+- Integrales de regiones (área, volumen, masa, centroide, inercia): contraste cuasi-Monte Carlo (Halton) directamente sobre las desigualdades del enunciado; si no coincide con el resultado del motor, **no se entrega el resultado** (`VerificationFailed`).
+- Integrales definidas: cuadratura tanh-sinh contrastada con Simpson compuesto.
+- Derivadas del cálculo vectorial: diferencias finitas; campos conservativos: comprobación exacta de ∇φ = F; circulación en curvas cerradas: contraste con el teorema de Green.
+
+Límites reales (no ocultos):
+- **No hay componente de IA en la nube ni LLM** en esta versión: la interpretación del texto es determinista (reglas + planificador de candidatos). Un enunciado redactado de forma muy libre o ambigua puede no reconocerse; en ese caso se responde «no soportado», nunca un resultado inventado.
+- No cubre aún: problemas de palabras eléctricos/probabilísticos en texto libre, teorema de Stokes, superficies paramétricas, integrales de superficie generales y flujo por superficies abiertas, regiones no lineales con más de tres superficies, EDO no estándar.
+- Las operaciones basadas en SymPy (series, valores propios, Laplace, EDO, estadística, unidades) se ejercitan en CI/app; en el entorno de desarrollo sin SymPy sus pruebas quedan omitidas.
+- El contraste Monte Carlo tiene tolerancia estadística (≈4 %): detecta interpretaciones erróneas, no certifica dígitos; los dígitos los garantiza la integración exacta/tanh-sinh.
