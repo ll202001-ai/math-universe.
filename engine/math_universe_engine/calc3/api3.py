@@ -54,7 +54,7 @@ def _fin(res, metodo):
 def run(req, st):
     p = dict(req.get("params") or {})
     tipo = p.get("tipo")
-    if tipo != "suma" and tipo not in TIPOS: raise InvalidRequest("params.tipo debe ser uno de: " + ", ".join(TIPOS))
+    if tipo not in ("suma", "auto", "cambio_variables_masa") and tipo not in TIPOS: raise InvalidRequest("params.tipo debe ser uno de: " + ", ".join(TIPOS))
     try:
         return _run(tipo, p, req, st)
     except NoSoportado as e:
@@ -88,6 +88,9 @@ def _suma(p, req, st):
 
 
 def _run(tipo, p, req, st):
+    if tipo == "auto":
+        from . import enunciado
+        return enunciado.resolver(_req(p, "texto"), req, st)
     if tipo == "suma":
         return _suma(p, req, st)
     if tipo == "iterada":
@@ -141,6 +144,18 @@ def _run(tipo, p, req, st):
         J = r["J"]
         return {"status": "success_exact", "exact_result": J.to_str(), "approximate_result": None, "method": "jacobiano_simbolico",
                 "verification": {"status": "not_performed", "method": None}, "steps": r["pasos"], "data": {"J": J.to_str(), "latex": J.to_str(True)}}
+    if tipo == "cambio_variables_masa":
+        d = _req(p, "delta")
+        def uno(f):
+            return CA.cambio_variables_doble(f, _req(p, "curvas"), list(_req(p, "nuevas")), _req(p, "mapa"), p.get("modo", "inverso"),
+                                             p.get("orden", "dydx"), punto=_punto(p))
+        m, My, Mx = uno(f"({d})"), uno(f"({d})*x"), uno(f"({d})*y")
+        for k in (m, My, Mx):
+            if k.get("verificacion") == "failed": raise VerificationFailed("La verificación independiente falló", {})
+        xb = AP._cociente(My["exacto"], m["exacto"]) if m["exacto"] is not None and My["exacto"] is not None else None
+        yb = AP._cociente(Mx["exacto"], m["exacto"]) if m["exacto"] is not None and Mx["exacto"] is not None else None
+        r = {"m": m, "My": My, "Mx": Mx, "xbar": xb, "ybar": yb, "xbar_aprox": My["aprox"] / m["aprox"], "ybar_aprox": Mx["aprox"] / m["aprox"]}
+        return _fin_masa(r)
     if tipo == "cambio_variables":
         r = CA.cambio_variables_doble(_req(p, "f"), _req(p, "curvas"), list(_req(p, "nuevas")), _req(p, "mapa"), p.get("modo", "inverso"),
                                       p.get("orden", "dydx"), punto=_punto(p))

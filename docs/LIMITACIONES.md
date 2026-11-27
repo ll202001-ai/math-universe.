@@ -71,3 +71,13 @@ Límites conocidos:
   análogo de libro (Sullivan, cilindro y²+z²=4 con plano x+z=5); el valor impreso no corresponde a ninguna lectura probada.
 - Pantalla «Mat. III»: parámetros_extremo y parámetros_condicion existen en el motor pero aún no tienen formulario.
 - Operación `suma` (varias piezas, cada una una solicitud calc3 con resultado exacto único): usada para sólidos cuya tapa cambia (#19.6).
+
+## Matemática III: enunciado en texto libre (`tipo: "auto"`)
+
+El intérprete lee el enunciado, reconoce el tipo (extremos, Lagrange, ajuste, Jacobiano, integrales iteradas, áreas, volúmenes, masas, centroides, inercias, coordenadas polares/cilíndricas/esféricas, sustituciones) y resuelve probando varios planteamientos; solo se acepta uno si el resultado es exacto y lo confirma la integración numérica independiente. Si ninguno es exacto, se informa como aproximado.
+
+Límites conocidos:
+- Cotas con potencias escritas sin llaves (`∫_x^1`) se leen como exponente: use llaves `{x^2}`.
+- `x^2/2y` es ambiguo; escriba paréntesis. Al copiar desde PDF se pierden a veces los superíndices («4𝑥2»): revíselos.
+- No cubre aún: integrales de superficie y campos vectoriales; suma de integrales a una sola; planteo sin evaluar (escribir la integral con ambos órdenes); las otras cinco permutaciones de una integral triple; sólidos con 3 o más superficies superiores que requieran dividirse (use «Sólido en dos piezas»); problemas de palabras sin formulación matemática.
+- Si el enunciado deja varias regiones cerradas posibles se toma la del primer cuadrante y se avisa en las advertencias.

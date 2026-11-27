@@ -65,6 +65,18 @@ const _cOrden = _Campo('orden', 'Orden de integración', opciones: _ordenes);
 const _cPunto = _Campo('punto', 'Punto dentro de la región (opcional, si hay varias regiones)', hint: '1, 1');
 
 final List<_Tipo> _tipos = [
+  _Tipo('auto', 'Ejercicio tal como aparece en la guía (texto libre)',
+      'Escriba o pegue el enunciado completo. El motor interpreta qué se pide, identifica la región, las variables y el método, resuelve, '
+          'muestra el procedimiento y verifica con una integración numérica independiente. Para potencias use ^ (x^2) o los superíndices ², ³; '
+          'si pega desde un PDF revise que los exponentes no se hayan perdido.',
+      const [
+        _Campo('texto', 'Enunciado del ejercicio', lines: 6,
+            hint: 'Calcule el área limitada por las curvas y = x², y = 2x², y² = x, y² = 2x, utilizando la sustitución x² = u y y² = v x'),
+      ],
+      (v) {
+        if ((v['texto'] ?? '').trim().isEmpty) throw const FormatException('Escriba el enunciado del ejercicio');
+        return {'tipo': 'auto', 'texto': v['texto']};
+      }),
   _Tipo('iterada', 'Integral iterada (límites dados)', 'Escriba los niveles de adentro hacia afuera: variable, límite inferior, límite superior.', const [
     _Campo('f', 'Integrando', hint: 'x*y'),
     _Campo('niveles', 'Niveles (uno por línea, el primero es la integral interna)', lines: 3, hint: 'y, 0, x\nx, 0, 1'),
