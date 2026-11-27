@@ -100,3 +100,16 @@ Entrada: `structured_input.a` (y `.b`) como lista de listas `[[1,"1/2"],[0.25,3]
 | `matrix_solve` | a (m×n), b (m×1) | texto | `kind` (`unique`/`infinite`/`none`), `particular`, `nullspace_basis`, certificado | A·x=b y A·v=0; sin solución: certificado de Farkas |
 `matrix_solve`: estado `success_exact` (única), `multiple_solutions` (infinitas) o `no_solution`.
 Los archivos golden del contrato están en `engine/tests/golden/matrices/` (regresión; los valores conocidos se comprueban a mano en `test_21`).
+
+## Operaciones añadidas en API 1.3 (motor 0.7.0, aditivas)
+Todas devuelven `verification.status = passed` solo si la comprobación independiente cuadra; si no, `VERIFICATION_FAILED`.
+| Operación | Entradas | Ejemplo → `exact_result` | Verificación independiente |
+|---|---|---|---|
+| `sum`, `product` | `expression`, `params.var`, `params.from`, `params.to` (`oo` = ∞) | `k`, k=1..10 → `55`; `1/k^2`, 1..oo → `pi^2/6` | suma directa de términos, o sumas parciales mpmath para series; divergentes → `diverge` con `not_possible` |
+| `substitute` | `expression`, `params.values` `{x: "2", y: "a+1"}` | `x^2+y` → `a + 5` | evaluador propio en puntos |
+| `matrix_symbolic` | `structured_input.a` (y `.b`), `params.op` ∈ det, inverse, transpose, mul, charpoly, eigen (hasta 8×8) | `[[a,b],[c,d]]` det → `a*d - b*c` | A·A⁻¹=I simplificado, det por dos métodos, evaluación en puntos racionales |
+| `logic` | `expression` con `& | ~ -> <->`, `∧ ∨ ¬ → ↔`, «y/o/no» | `~(p & q)` → `¬p ∨ ¬q`; `data.classification`, `data.truth_table` | tabla de verdad completa (parser propio) |
+| `sets` | `expression` con intervalos `[a,b]`, `(a,b)`, conjuntos `{…}` y `∪ ∩ \` | `[0,2] ∪ [1,3]` → `[0, 3]` | pertenencia en puntos de prueba |
+| `implicit_diff` | `expression` = ecuación en x, y | `x^2+y^2=1` → `-x/y` | coincide con −F_x/F_y (teorema de la función implícita, vía distinta de idiff) |
+Funciones añadidas al parser: `%` (postfijo, /100), `log(x,b)`, `cbrt`, `root(x,n)`, `sec csc cot`, `asinh acosh atanh`,
+`gamma erf erfc beta zeta besselj floor ceil`. `evaluate` usa SymPy como respaldo verificado; `zoo`/`nan`/`oo` → `domain_error`.

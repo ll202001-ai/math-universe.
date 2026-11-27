@@ -4,9 +4,9 @@
 [Setup]
 AppId={{6D5B6A52-3C0A-4C3B-9E87-4D41A1F0C1A7}
 AppName=MATH UNIVERSE
-AppVersion=0.6.0
-AppVerName=MATH UNIVERSE 0.6.0
-VersionInfoVersion=0.6.0
+AppVersion=0.7.0
+AppVerName=MATH UNIVERSE 0.7.0
+VersionInfoVersion=0.7.0
 AppPublisher=MATH UNIVERSE
 DefaultDirName={autopf}\MATH UNIVERSE
 DefaultGroupName=MATH UNIVERSE

@@ -41,8 +41,11 @@ def check_size(n_terms):
 
 
 def _child(q, func, args):
+    from .errors import EngineError
     try:
         q.put(("ok", func(*args)))
+    except EngineError as e:  # pragma: no cover - se ejecuta en el proceso hijo
+        q.put(("engine", (type(e).__name__, e.message, e.details)))
     except BaseException as e:  # pragma: no cover
         q.put(("err", repr(e)))
 
@@ -94,6 +97,11 @@ def run_hard_timeout(func, args, timeout_s):
         p.terminate(); p.join(2)
         raise TimeoutExceeded("Se agotó el tiempo de cálculo permitido (proceso terminado)")
     p.join(2)
+    if kind == "engine":                                   # error del contrato (p. ej. dominio): se conserva su código
+        from . import errors
+        name, message, details = val
+        cls = getattr(errors, name, errors.EngineError)
+        raise cls(message, details)
     if kind == "err":
         raise RuntimeError(val)
     return val

@@ -4,7 +4,7 @@ No tiene que instalar Python, Flutter, SymPy ni ninguna herramienta de programac
 
 ## Descargar
 En la página del repositorio en GitHub, sección **Releases** (columna derecha), abra la versión más reciente
-(`MATH UNIVERSE 0.6.0`) y descargue:
+(`MATH UNIVERSE 0.7.0`) y descargue:
 
 | Equipo | Archivo |
 |---|---|
@@ -27,9 +27,11 @@ Cada versión publicada se compiló y se verificó automáticamente: se instaló
 3. Si Google Play Protect avisa de una app desconocida: **Instalar de todas formas** (el APK no está publicado en Play Store).
 
 ## Primer uso
-- Escriba un problema, por ejemplo `x^2-5*x+6=0`, y pulse el botón grande. La app sugiere la operación y usted puede
-  cambiarla (Calcular, Simplificar, Factorizar, Resolver, Derivar, Integrar, Límite).
-- Toque un ejemplo para insertarlo, o use el teclado científico (pestañas Básico, Funciones y Álgebra).
+- Construya la expresión con el teclado matemático (10 pestañas): el botón de fracción crea numerador y denominador;
+  ↑ ↓ ← → mueven el cursor entre casillas y ⇥ salta a la siguiente casilla vacía. También puede escribir con el teclado
+  del equipo (`/` hace fracción, `^` exponente) o pegar texto.
+- Pulse Simplificar, Expandir, Factorizar, Resolver o «=». La app sugiere la operación y usted puede cambiarla.
+- «+ Nueva expresión» añade otro bloque a la hoja; toque un bloque anterior para editarlo y recalcularlo.
 - «Procedimiento y verificación» muestra cómo se obtuvo el resultado y cómo se comprobó.
 - Menú (⋮) → **Comprobar instalación**: ejecuta una autoprueba completa en su equipo, sin internet.
 - Menú (⋮) → **Acerca de y limitaciones**: lo que la app hace y lo que todavía no hace.

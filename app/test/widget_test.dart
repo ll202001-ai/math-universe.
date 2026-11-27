@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:math_universe_app/data/history_store.dart';
 import 'package:math_universe_app/main.dart';
+import 'package:math_universe_app/ui/math_view.dart';
 
 import 'fakes.dart';
 
@@ -16,6 +17,21 @@ Map<String, dynamic> _handler(Map<String, dynamic> req) {
     default:
       return okResponse('resultado:${req['expression']}');
   }
+}
+
+Future<void> selTab(WidgetTester tester, String name) async {
+  final tab = find.byKey(Key('pestana_$name'));
+  final list = find.descendant(of: find.byKey(const Key('pestanas_teclado')), matching: find.byType(Scrollable)).first;
+  for (final dx in [-300.0, 300.0]) {
+    for (var i = 0; i < 12 && tab.evaluate().isEmpty; i++) {
+      await tester.drag(list, Offset(-dx, 0));
+      await tester.pumpAndSettle();
+    }
+  }
+  await tester.ensureVisible(tab);
+  await tester.pumpAndSettle();
+  await tester.tap(tab);
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -103,6 +119,9 @@ void main() {
   });
 
   testWidgets('con "=" sugiere Resolver, y el usuario puede elegir otra operacion antes de calcular', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await tester.pumpAndSettle();
@@ -123,29 +142,125 @@ void main() {
     expect(eng.lastCalc['expression'], 'x^2-5*x+6');
   });
 
-  testWidgets('el teclado cientifico inserta en el cursor y calcula', (tester) async {
-    tester.view.physicalSize = const Size(1400, 1000);
+  testWidgets('teclado matematico: construir (x²+3x+2)/(x+1) solo con teclas, sin escribir caracteres especiales', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final eng = FakeEngine(_handler);
     await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
     await tester.pumpAndSettle();
-    for (final k in ['1', '+', '1']) {
-      await tester.tap(find.bySemanticsLabel(k == '+' ? 'mas' : k).first);
+    Future<void> key(String id) async {
+      await tester.tap(find.byKey(Key('tecla_$id')));
       await tester.pump();
     }
-    expect(find.text('1+1'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('tecla_borrar')));
-    await tester.pump();
-    expect(find.text('1+'), findsOneWidget);
-    await tester.tap(find.text('Funciones'));
+
+    await key('fracción'); // numerador y denominador editables
+    await key('x');
+    await key('al cuadrado');
+    await key('más');
+    await key('3');
+    await key('x');
+    await key('más');
+    await key('2');
+    await key('abajo'); // al denominador
+    await key('x');
+    await key('más');
+    await key('1');
+    expect(find.byKey(const Key('editor_latex')), findsOneWidget);
+    expect(tester.widget<TextField>(find.byKey(const Key('campo_expresion'))).controller!.text, '((x^2+3x+2)/(x+1))');
+    await tester.tap(find.byKey(const Key('accion_simplify')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('sin'));
+    expect(eng.lastCalc['operation'], 'simplify');
+    expect(eng.lastCalc['expression'], '((x^2+3x+2)/(x+1))');
+
+    // cambiar de pestaña no altera la expresion; deshacer y borrar funcionan
+    await selTab(tester, 'Trigonometría');
+    await key('sin');
+    await selTab(tester, 'Básico');
+    expect(tester.widget<TextField>(find.byKey(const Key('campo_expresion'))).controller!.text, '((x^2+3x+2)/(x+1))',
+        reason: 'el seno con argumento vacio no cambia el texto valido');
+    await key('deshacer');
+    await key('ac');
+    expect(tester.widget<TextField>(find.byKey(const Key('campo_expresion'))).controller!.text, '',
+        reason: 'limpiar (AC) vacia tambien la linea de texto');
+    await key('deshacer');
     await tester.pump();
-    expect(find.text('1+sin()'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('tecla_ac')));
+    expect(find.byKey(const Key('editor_latex')), findsOneWidget, reason: 'deshacer recupera la expresion');
+  });
+
+  testWidgets('plantillas: integral definida y sumatoria se envian como operacion del motor', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final eng = FakeEngine(_handler);
+    await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    Future<void> key(String id) async {
+      await tester.tap(find.byKey(Key('tecla_$id')));
+      await tester.pump();
+    }
+
+    await selTab(tester, 'Cálculo');
+    await key('integral_definida'); // cursor en el limite inferior
+    await selTab(tester, 'Básico');
+    await key('0');
+    await key('derecha');
+    await key('1');
+    await key('derecha');
+    await key('x');
+    await key('al cuadrado');
+    await tester.tap(find.byKey(const Key('tecla_calcular')));
+    await tester.pumpAndSettle();
+    expect(eng.lastCalc['operation'], 'integrate');
+    expect(eng.lastCalc['expression'], 'x^2');
+    expect(eng.lastCalc['lower'], '0');
+    expect(eng.lastCalc['upper'], '1');
+    expect(eng.lastCalc['variables'], ['x']);
+
+    // nueva expresion en otro bloque: la anterior se conserva en la hoja
+    await tester.tap(find.byKey(const Key('boton_nuevo_bloque')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bloque_0')), findsOneWidget);
+    await selTab(tester, 'Cálculo');
+    await key('sumatoria'); // k ya puesto; cursor en el valor inicial
+    await selTab(tester, 'Básico');
+    await key('1');
+    await key('derecha');
+    await key('1');
+    await key('0');
+    await key('derecha');
+    await selTab(tester, 'Cálculo');
+    await key('k');
+    await tester.tap(find.byKey(const Key('tecla_calcular')));
+    await tester.pumpAndSettle();
+    expect(eng.lastCalc['operation'], 'sum');
+    expect(eng.lastCalc['params'], {'var': 'k', 'from': '1', 'to': '10'});
+    expect(eng.lastCalc['expression'], 'k');
+
+    // volver al primer bloque y recalcularlo
+    await tester.tap(find.byKey(const Key('bloque_0')));
+    await tester.pumpAndSettle();
+    final shown = tester.widget<MathView>(find.byKey(const Key('editor_latex'))).latex!;
+    expect(shown, contains(r'\int_{0}^{1}'), reason: 'el bloque 1 vuelve a abrirse con su integral para editarla');
+  });
+
+  testWidgets('una plantilla incompleta se explica y no se envia nada', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final eng = FakeEngine(_handler);
+    await tester.pumpWidget(MathUniverseApp(engine: eng, store: MemoryHistoryStore()));
+    await tester.pumpAndSettle();
+    final before = eng.received.length;
+    await tester.tap(find.byKey(const Key('tecla_fracción')));
     await tester.pump();
-    expect(find.text('1+sin()'), findsNothing);
+    await tester.tap(find.byKey(const Key('tecla_1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tecla_calcular')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('error_editor')), findsOneWidget);
+    expect(find.textContaining('denominador'), findsOneWidget);
+    expect(eng.received.length, before);
   });
 
   testWidgets('el panel de procedimiento muestra metodo y verificacion reales del motor', (tester) async {

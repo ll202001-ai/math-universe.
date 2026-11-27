@@ -11,7 +11,7 @@ from .errors import ParseError, LimitExceeded
 
 MAX_LEN = 5000
 MAX_DEPTH = 100
-_TOKEN = re.compile(r"\s*(?:(\d+\.?\d*(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)|([A-Za-z_][A-Za-z_0-9]*)|(\*\*|[-+*/^(),!]))")
+_TOKEN = re.compile(r"\s*(?:(\d+\.?\d*(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)|([A-Za-z_][A-Za-z_0-9]*)|(\*\*|[-+*/^(),!%]))")
 CALLABLE_NAMES = None  # el evaluador valida nombres de función
 
 
@@ -99,6 +99,8 @@ class _P:
                 if self.peek() == ("op", "!"):
                     raise ParseError("'!!' es ambiguo (factorial doble o factorial iterado): use paréntesis, por ejemplo (3!)!", {"token": self.i})
                 left = ("fact", left); continue
+            if k == "op" and v == "%":                       # 0.7.0: porcentaje postfijo, 50% = 50/100
+                self.next(); left = ("bin", "/", left, ("num", Fraction(100))); continue
             if k == "op" and v in ("+", "-") and minp <= 10:
                 self.next(); left = ("bin", v, left, self.expr(11)); continue
             if k == "op" and v in ("*", "/") and minp <= 20:

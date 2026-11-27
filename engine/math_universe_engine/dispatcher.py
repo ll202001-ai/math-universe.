@@ -6,7 +6,7 @@ import re
 import time
 from fractions import Fraction
 from . import __version__, symbolic, limits, calculus, numeric_mp, solve as S
-from . import advanced, plot as P, presentation, steps as STEPS, interpret as NL
+from . import advanced, advanced2, plot as P, presentation, steps as STEPS, interpret as NL
 from .arith import evaluate as arith_eval, format_fraction, to_decimal
 from .ast_tools import normalize, to_str, free_symbols, eval_float, eval_q, const_value
 from .errors import *
@@ -16,7 +16,7 @@ from .qsqrt import Q, q_to_decimal
 from .rational import Ctx, to_rf, rf_str, condition_list
 from .verify import equivalent
 
-API_VERSION = "1.2"
+API_VERSION = "1.3"
 _SCHEMA_DIR = os.path.join(os.path.dirname(__file__), "..", "schema")
 try:
     import jsonschema
@@ -91,7 +91,11 @@ def capabilities():
                 "transformada_de_laplace": "directa e inversa, verificadas por cuadratura numerica",
                 "estadistica_descriptiva": "exacta, verificada con el modulo statistics", "unidades": "SI y analisis dimensional",
                 "graficas": "2D, parametricas, polares y superficies (muestreo del motor)", "paso_a_paso": "ecuaciones de grado 1 y 2, derivadas, Gauss-Jordan",
-                "lenguaje_natural": "instrucciones en espanol por reglas (siempre con confirmacion)"}}
+                "lenguaje_natural": "instrucciones en espanol por reglas (siempre con confirmacion)",
+                "sumatorias_y_productorias": "finitas, infinitas y con limite simbolico (verificadas)",
+                "sustitucion": "con verificacion en puntos", "matrices_simbolicas": "det, inversa, transpuesta, producto, polinomio caracteristico, autovalores",
+                "logica_proposicional": "simplificar, FNC, FND, tabla de verdad", "conjuntos": "intervalos y conjuntos finitos: union, interseccion, diferencia",
+                "derivacion_implicita": "dy/dx de F(x, y) = 0", "funciones_especiales": "gamma, beta, erf, zeta, Bessel J, hiperbolicas inversas, sec/csc/cot, log en base b, porcentaje"}}
 
 
 def _validate(req):
@@ -571,9 +575,10 @@ def _dispatch(req, st):
         return op_matrix(req, st)
     if op == "formulas": return {"data": {"formulas": advanced.formulas_catalog()}}
     if op == "interpret": return {"data": NL.interpret(req.get("expression") or "")}
-    if op in advanced.ADVANCED_OPS:
+    if op in advanced.ADVANCED_OPS or op in advanced2.ADVANCED2_OPS:
         remaining = max(0.5, limits._deadline - time.perf_counter()) if limits._deadline else 30
-        out = limits.run_in_thread(advanced.run, (req, st), remaining)
+        runner = advanced.run if op in advanced.ADVANCED_OPS else advanced2.run
+        out = limits.run_in_thread(runner, (req, st), remaining)
         st.conditions.extend(out.pop("conditions_extra", []) or [])
         return out
     if op in ("plot", "plot3d", "parametric", "polar"):
@@ -600,10 +605,12 @@ def _sympy_fallback(req, st, op, cause):
     txt = limits.run_hard_timeout(symbolic.run, (op, ast, req.get("variables")), remaining)
     st.warnings.append("Resultado calculado por SymPy (respaldo experimental); sin procedimiento detallado")
     r = _result(exact=txt, method="sympy_respaldo_experimental", parsed={"canonical": to_str(ast)})
+    if op == "evaluate":
+        r["approximate_result"] = _numeric_approx(txt, st)
     # El resultado de SymPy pasa por la MISMA verificación independiente que los del motor propio.
     verdict, how = "not_possible", None
     try:
-        if op in ("simplify", "expand", "factor"):
+        if op in ("simplify", "expand", "factor", "evaluate"):
             verdict, how = equivalent(ast, txt, st.assumptions), "evaluacion_en_puntos"
         else:
             var = (req.get("variables") or sorted(free_symbols(ast)) or ["x"])[0]

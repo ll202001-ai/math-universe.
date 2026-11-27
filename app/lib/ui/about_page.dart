@@ -67,7 +67,8 @@ const knownLimitations = <String>[
   'Ecuaciones con radicales, valor absoluto, exponenciales o trigonométricas y algunas integrales pueden devolver «No soportado».',
   'Los resultados calculados con SymPy se marcan como tales y pasan por una comprobación independiente. Si no se puede comprobar, se indica.',
   'Ceros y extremos marcados en las gráficas son aproximaciones numéricas del muestreo.',
-  'Matrices: solo entradas numéricas exactas, hasta 40×40 (autovalores exactos hasta 6×6).',
+  'Matrices numéricas exactas hasta 40×40 (autovalores exactos hasta 6×6); matrices con letras hasta 8×8 (sujetas al límite de tiempo).',
+  'Editor: el cursor se mueve con flechas, Tab y el teclado; tocar la fórmula no coloca el cursor en el punto exacto. Integrales, sumatorias, límites y derivadas deben ser la expresión completa del bloque.',
   'Ingeniería: cálculos de apoyo; no sustituyen un diseño certificado ni una inspección profesional.',
   'El instalador de Windows y el APK no están firmados con un certificado comercial: Windows o Android pueden mostrar un aviso.',
 ];

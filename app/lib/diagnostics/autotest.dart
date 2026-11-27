@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../data/history_store.dart';
+import '../editor/editor_controller.dart';
+import '../editor/math_node.dart';
 import '../engine/engine_client.dart';
 import '../engine/models.dart';
 
@@ -178,7 +180,66 @@ Future<AutotestReport> runAutotest(EngineClient engine, Future<HistoryStore> Fun
     'params': {'xmin': -2, 'xmax': 2, 'samples': 101}
   }, (r) => (((r.data['series'] as List?)?.first as Map?)?['segments'] as List?)?.length == 2);
 
-  // 5. Persistencia SQLite real: escribir, cerrar, reabrir, leer, borrar.
+  // 5. Version 0.7.0: editor estructurado conectado al motor real y nuevas operaciones verificadas.
+  try {
+    // Mismas acciones que los botones: fraccion, x, potencia, 2, salir, +3x+2, bajar al denominador, x+1.
+    final ed = EditorController();
+    ed.insert(MNode.of(NK.frac));
+    ed.insertAtom('x');
+    ed.insert(MNode.of(NK.pow));
+    ed.insertAtom('2');
+    ed.right();
+    for (final a in ['+', '3', 'x', '+', '2']) {
+      ed.insertAtom(a);
+    }
+    ed.down();
+    for (final a in ['x', '+', '1']) {
+      ed.insertAtom(a);
+    }
+    final req = ed.toRequest();
+    final r = await call({'operation': 'simplify', 'expression': req.expression});
+    add('Editor visual: fracción (x²+3x+2)/(x+1) construida con botones → x + 2',
+        r.exactResult == 'x + 2' && r.conditions.contains('x ≠ -1') && verified(r), 'entrada=${req.expression} | ${show(r)}');
+  } catch (e) {
+    add('Editor visual: fracción (x²+3x+2)/(x+1) construida con botones → x + 2', false, 'excepcion: $e');
+  }
+  await expectEngine('Sumatoria Σ k (k=1..10) = 55', {
+    'operation': 'sum',
+    'expression': 'k',
+    'params': {'var': 'k', 'from': '1', 'to': '10'}
+  }, (r) => r.exactResult == '55' && verified(r), ms: 60000);
+  await expectEngine('Serie Σ 1/k² (k=1..∞) = π²/6', {
+    'operation': 'sum',
+    'expression': '1/k^2',
+    'params': {'var': 'k', 'from': '1', 'to': 'oo'}
+  }, (r) => r.exactResult == 'pi^2/6' && verified(r), ms: 60000);
+  await expectEngine('Sustitución x=2, y=a+1 en x²+y = a + 5', {
+    'operation': 'substitute',
+    'expression': 'x^2+y',
+    'params': {
+      'values': {'x': '2', 'y': 'a+1'}
+    }
+  }, (r) => r.exactResult == 'a + 5' && verified(r), ms: 60000);
+  await expectEngine('Determinante simbólico [[a,b],[c,d]] = ad − bc', {
+    'operation': 'matrix_symbolic',
+    'structured_input': {
+      'a': [
+        ['a', 'b'],
+        ['c', 'd']
+      ]
+    },
+    'params': {'op': 'det'}
+  }, (r) => r.exactResult == 'a*d - b*c' && verified(r), ms: 60000);
+  await expectEngine('Lógica: ¬(p ∧ q) = ¬p ∨ ¬q (tabla de verdad)', {'operation': 'logic', 'expression': '~(p & q)'},
+      (r) => r.exactResult == '¬p ∨ ¬q' && verified(r), ms: 60000);
+  await expectEngine('Conjuntos: [0,2] ∪ [1,3] = [0, 3]', {'operation': 'sets', 'expression': '[0,2] ∪ [1,3]'},
+      (r) => r.exactResult == '[0, 3]' && verified(r), ms: 60000);
+  await expectEngine('Funciones especiales: gamma(5) + log(8,2) + 50% = 55/2', {
+    'operation': 'evaluate',
+    'expression': 'gamma(5)+log(8,2)+50%'
+  }, (r) => r.exactResult == '55/2' && verified(r), ms: 60000);
+
+  // 6. Persistencia SQLite real: escribir, cerrar, reabrir, leer, borrar.
   final marker = 'autoprueba-${DateTime.now().microsecondsSinceEpoch}';
   try {
     final s1 = await openStore();

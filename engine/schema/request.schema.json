@@ -1,6 +1,6 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
- "title": "MathUniverseRequest v1.2 (Adenda rectora §7 + álgebra lineal + módulos avanzados 0.6.0)",
+ "title": "MathUniverseRequest v1.3",
  "type": "object",
  "required": [
   "operation"
@@ -57,7 +57,14 @@
     "plot3d",
     "parametric",
     "polar",
-    "interpret"
+    "interpret",
+    "sum",
+    "product",
+    "substitute",
+    "matrix_symbolic",
+    "logic",
+    "sets",
+    "implicit_diff"
    ]
   },
   "expression": {

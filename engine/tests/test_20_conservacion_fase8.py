@@ -19,6 +19,8 @@ MODIFICADOS_DECLARADOS = {
     "engine/tests/test_06_seguridad_y_recursos.py",  # 0.5.0: la prueba decodifica el canal como UTF-8 (fallaba en Windows con Python < 3.15)
     "engine/math_universe_engine/limits.py",         # 0.5.0: SymPy en un hilo donde no hay procesos hijo (Android/Chaquopy)
     "engine/schema/response.schema.json",            # 0.6.0: contrato 1.2 (aditivo): campos opcionales latex y steps
+    "engine/math_universe_engine/symbolic.py",       # 0.7.0: funciones especiales y evaluate con respaldo SymPy verificado
+    "engine/math_universe_engine/ast_tools.py",      # 0.7.0: evaluador en coma flotante con funciones nuevas (vía independiente)
 }
 
 

@@ -103,7 +103,7 @@ def test_puente_android_funciona_importando_el_motor_desde_un_zip_sin_carpeta_sc
     a, b, c = json.loads(r.stdout)
     assert a["status"] == "success_exact", a
     assert b["exact_result"] == "2", b
-    assert c["status"] == "success_exact" and c["data"]["engine_version"] == "0.6.0", c
+    assert c["status"] == "success_exact" and c["data"]["engine_version"] == "0.7.0", c
 
 
 def _workflow():

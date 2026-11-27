@@ -1,6 +1,6 @@
-# Limitaciones conocidas · MATH UNIVERSE 0.6.0
+# Limitaciones conocidas · MATH UNIVERSE 0.7.0
 
-Lo que la versión 0.6.0 **no** hace todavía o hace con restricciones. Nada de esta lista se presenta en la app como
+Lo que la versión 0.7.0 **no** hace todavía o hace con restricciones. Nada de esta lista se presenta en la app como
 disponible. El catálogo exacto de operaciones no soportadas (generado y comprobado por las pruebas) está en
 `NO_SOPORTADO.md`.
 
@@ -10,10 +10,17 @@ disponible. El catálogo exacto de operaciones no soportadas (generado y comprob
   proyectos, exportación a PDF.
 - Entrada manuscrita (OCR) o por imagen y asistente de IA en línea (requiere un proveedor y su clave; se diseñará como
   servicio opcional). Las instrucciones en español se interpretan con reglas y SIEMPRE se piden confirmar.
-- Editor visual 2D (cursor dentro de fracciones y exponentes): la entrada es texto + teclado científico, con vista previa
-  dibujada de la fórmula.
+- Editor visual (0.7.0): el cursor se mueve con las flechas, Tab y el teclado; tocar la fórmula enfoca el editor pero
+  todavía no coloca el cursor en el punto exacto tocado. Integrales, Σ, Π, límites y d/dx deben ser la expresión completa
+  del bloque (no se pueden anidar dentro de otra expresión); si se anidan, se avisa y no se calcula nada.
 - Paso a paso: solo ecuaciones de primer y segundo grado, derivadas y Gauss-Jordan (inversa y sistemas). En lo demás
   se muestran el método y la verificación independiente (no se inventan pasos).
+
+## Disponible desde 0.7.0 (con verificación independiente)
+Editor matemático estructurado y teclado de 10 pestañas; hoja de trabajo con varios bloques; sumatorias y productorias
+(finitas e infinitas), sustitución de variables, matrices simbólicas (det, inversa, transpuesta, producto, polinomio
+característico, autovalores), lógica proposicional (simplificación, tautología/contradicción, tabla de verdad), conjuntos
+e intervalos, derivación implícita, funciones especiales (gamma, erf, beta, zeta, Bessel), porcentaje y log en base b.
 
 ## Disponible desde 0.6.0 (con verificación independiente)
 Autovalores y autovectores (hasta 6×6), derivadas parciales, gradiente, Hessiano y Jacobiano, series de Taylor,
@@ -27,7 +34,7 @@ gráficas 2D/paramétricas/polares/3D, LaTeX de entrada y resultado.
 - Integrales: polinomios, racionales con factores lineales/cuadráticos, polinomio·{exp, sin, cos}, xᵏ·ln x; otras pasan
   a SymPy (respaldo, marcado como tal y verificado) y, si tampoco, «No soportado». Integrales impropias: no.
 - Límites: series de Laurent; sin infinitos de funciones trascendentes.
-- Matrices: solo entradas numéricas exactas (enteros, fracciones, decimales), hasta 40×40; sin matrices simbólicas.
+- Matrices numéricas exactas hasta 40×40; matrices con letras (simbólicas) hasta 8×8, sujetas al límite de tiempo de cada cálculo.
 - Supuestos (`real`, `positive`…) solo se aplican en simplificar/expandir/factorizar/resolver.
 - Gráficas: ceros y extremos marcados son aproximaciones numéricas del muestreo.
 - EDO y transformadas: si SymPy no encuentra solución cerrada se responde «No soportado» (todavía no hay solución numérica de EDO).

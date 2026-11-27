@@ -1,16 +1,16 @@
-# MATH UNIVERSE · versión 0.6.0 (motor 0.6.0 · contrato 1.2)
+# MATH UNIVERSE · versión 0.7.0 (motor 0.7.0 · contrato 1.3)
 
 Calculadora matemática exacta para Windows y Android. Funciona sin internet: el motor matemático (Python con SymPy y
 mpmath) va dentro de la aplicación. **Para instalarla, lea [`LEEME_PRIMERO.md`](LEEME_PRIMERO.md).**
 
 | Carpeta | Contenido |
 |---|---|
-| `app/` | Interfaz Flutter (Windows y Android): calculadora, teclado científico, matrices, historial SQLite, autoprueba |
+| `app/` | Interfaz Flutter (Windows y Android): editor matemático visual, teclado de 10 pestañas, hoja de trabajo, matrices, historial SQLite, autoprueba |
 | `engine/` | Motor Python: parser seguro, CAS exacto propio, respaldo SymPy, mpmath, álgebra lineal, verificación independiente, pruebas |
 | `installer/` | Instalador de Windows (Inno Setup) |
 | `tools/ci/` | Empaquetado de Windows, integración Android (Chaquopy) y verificación de la instalación sin red |
 | `.github/workflows/construir.yml` | Compilación, pruebas, verificación y publicación automáticas |
-| `docs/` | Informe de entrega (`INFORME_ENTREGA_0.5.0.md`), limitaciones (`LIMITACIONES.md`), decisiones técnicas (`DECISIONES.md`), contrato del motor |
+| `docs/` | Informe de entrega (`INFORME_ENTREGA_0.7.0.md`), limitaciones (`LIMITACIONES.md`), decisiones técnicas (`DECISIONES.md`), contrato del motor |
 | `versiones_anteriores/` | Fase 8, fase 9B y el ZIP de la fase 10, intactos y con sus hashes |
 
 ## Arquitectura (corrección arquitectónica rectora)

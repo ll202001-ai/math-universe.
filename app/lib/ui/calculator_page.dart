@@ -1,17 +1,20 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/history_store.dart';
 import '../engine/engine_client.dart';
 import '../engine/models.dart';
-import 'math_keypad.dart';
+import '../editor/editor_controller.dart';
+import '../editor/keyboard_layout.dart';
+import '../editor/math_editor.dart';
+import '../editor/math_keyboard.dart';
+import '../editor/math_node.dart';
 import 'math_view.dart';
 import 'result_view.dart';
 
-/// Area de trabajo unica de la calculadora: expresion (con vista previa dibujada), herramienta interpretada y
-/// modificable (por categorias o busqueda), opciones contextuales, resultado y teclado cientifico.
+/// Hoja de trabajo matematica (0.7.0): varias expresiones en bloques; cada una se construye con el editor visual
+/// estructurado (fracciones, raices, potencias, integrales, matrices…) y el teclado de 10 pestañas, o como texto.
+/// La herramienta es interpretada y modificable (categorias o busqueda) y tiene opciones contextuales.
 /// Todo calculo lo hace el motor local; las instrucciones en espanol se interpretan y se confirman antes de calcular.
 class CalculatorPage extends StatefulWidget {
   const CalculatorPage({super.key, required this.engine, required this.store, this.initialExpression, this.initialOperation});
@@ -26,64 +29,175 @@ class CalculatorPage extends StatefulWidget {
 
 const _digitsOptions = <int>[15, 30, 50, 100];
 
-class _CalculatorPageState extends State<CalculatorPage> {
+/// Un bloque de la hoja de trabajo: su expresion (editor + texto), la operacion elegida y su resultado.
+class _Block {
+  _Block(this.ed);
+  final EditorController ed;
+  String text = '';
+  bool textSource = false; // true: lo ultimo editado fue la linea de texto (se envia tal cual)
+  String? manualOp;
+  EngineResponse? resp;
+  String? lastInput;
+  String? localError;
+}
+
+class _CalculatorPageState extends State<CalculatorPage> implements KeyboardHost {
   late final TextEditingController _expr = TextEditingController(text: widget.initialExpression ?? '');
+  final List<_Block> _blocks = [];
+  int _active = 0;
+  bool _syncing = false;
+  bool? _showKeyboard;
   final TextEditingController _var = TextEditingController();
   final TextEditingController _point = TextEditingController(text: '0');
   final TextEditingController _order = TextEditingController();
   final TextEditingController _lower = TextEditingController();
   final TextEditingController _upper = TextEditingController();
   final TextEditingController _conds = TextEditingController();
-  final FocusNode _focus = FocusNode();
-  String? _manualOp;
+  final FocusNode _editorFocus = FocusNode(debugLabel: 'editor');
   String _category = opCategories.first;
   String _direction = 'both';
   int _digits = 15;
-  bool _showKeypad = true;
-  EngineResponse? _resp;
-  String? _lastInput;
   bool _busy = false;
-  String? _preview;
-  Timer? _debounce;
   Map<String, dynamic>? _interpretation;
+
+  _Block get _b => _blocks[_active];
+  EditorController get _ed => _b.ed;
+  String? get _manualOp => _b.manualOp;
+  set _manualOp(String? v) => _b.manualOp = v;
+  EngineResponse? get _resp => _b.resp;
+  String? get _lastInput => _b.lastInput;
 
   @override
   void initState() {
     super.initState();
-    _manualOp = widget.initialOperation;
+    _addBlock(text: widget.initialExpression ?? '', op: widget.initialOperation);
     if (_manualOp != null) _category = opSpec(_manualOp!)?.category ?? _category;
     _expr.addListener(_onText);
   }
 
-  void _onText() {
-    if (!mounted) return;
-    setState(() => _interpretation = null);
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 450), _updatePreview);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // teclado visible por defecto si hay altura suficiente (en pantallas bajas se abre con el boton)
+    _showKeyboard ??= MediaQuery.of(context).size.height >= 700;
   }
 
-  /// Vista previa dibujada de lo que se esta escribiendo (el motor la genera; no calcula nada).
-  Future<void> _updatePreview() async {
-    final t = _expr.text.trim();
-    if (t.isEmpty || looksLikeNaturalLanguage(t) || const {'units', 'stats', 'ode', 'inequality'}.contains(_op)) {
-      if (mounted) setState(() => _preview = null);
+  void _addBlock({String text = '', String? op}) {
+    final b = _Block(EditorController());
+    b.ed.addListener(() => _onEditor(b));
+    if (text.isNotEmpty) {
+      b.text = text;
+      b.textSource = true;
+      b.ed.replaceQuiet(parseLinear(text));
+    }
+    b.manualOp = op;
+    _blocks.add(b);
+    _active = _blocks.length - 1;
+  }
+
+  void _activate(int i) {
+    if (i == _active) return;
+    setState(() {
+      _active = i;
+      _interpretation = null;
+      _syncing = true;
+      _expr.text = _b.text;
+      _syncing = false;
+    });
+  }
+
+  void _newBlock() {
+    setState(() {
+      _addBlock();
+      _interpretation = null;
+      _syncing = true;
+      _expr.text = '';
+      _syncing = false;
+    });
+    _editorFocus.requestFocus();
+  }
+
+  void _deleteBlock(int i) {
+    if (_blocks.length == 1) {
+      setState(() {
+        _b.ed.clear();
+        _b.resp = null;
+      });
       return;
     }
-    final r = await widget.engine.send({'operation': 'parse', 'expression': t, 'latex': true, 'timeout_ms': 5000});
-    if (!mounted || _expr.text.trim() != t) return;
-    setState(() => _preview = r.status == 'success_exact' ? r.latexInput : null);
+    setState(() {
+      _blocks.removeAt(i);
+      if (_active >= _blocks.length) _active = _blocks.length - 1;
+      _syncing = true;
+      _expr.text = _b.text;
+      _syncing = false;
+    });
+  }
+
+  /// La linea de texto cambio (el usuario escribio o pego): el editor se reconstruye sin tocar el texto.
+  void _onText() {
+    if (!mounted || _syncing) return;
+    final b = _b;
+    b.text = _expr.text;
+    b.textSource = true;
+    b.localError = null;
+    _syncing = true;
+    if (looksLikeNaturalLanguage(_expr.text)) {
+      b.ed.replaceQuiet(MRow());
+    } else {
+      b.ed.replaceQuiet(parseLinear(_expr.text));
+    }
+    _syncing = false;
+    setState(() => _interpretation = null);
+  }
+
+  /// El editor visual cambio: la linea de texto muestra lo que se enviara al motor.
+  void _onEditor(_Block b) {
+    if (!mounted || _syncing) return;
+    b.textSource = false;
+    b.localError = null;
+    String t;
+    try {
+      t = b.ed.toEngine();
+    } on EditorError {
+      t = b.text; // expresion incompleta: se conserva el ultimo texto valido
+    } catch (_) {
+      t = b.text;
+    }
+    b.text = t;
+    if (identical(b, _b)) {
+      _syncing = true;
+      _expr.text = t;
+      _syncing = false;
+    }
+    setState(() => _interpretation = null);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _expr.removeListener(_onText);
     for (final c in [_expr, _var, _point, _order, _lower, _upper, _conds]) {
       c.dispose();
     }
-    _focus.dispose();
+    for (final b in _blocks) {
+      b.ed.dispose();
+    }
+    _editorFocus.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------- KeyboardHost
+  @override
+  void setOperation(String op, {bool calculate = false}) {
+    setState(() {
+      _manualOp = op;
+      _category = opSpec(op)?.category ?? _category;
+    });
+    if (calculate) _calculate();
+  }
+
+  @override
+  void calculate() => _calculate();
 
   String get _op => _manualOp ?? suggestOperation(_expr.text);
   OpSpec get _spec => opSpec(_op) ?? opCatalog.first;
@@ -93,17 +207,63 @@ class _CalculatorPageState extends State<CalculatorPage> {
 
   List<String> _list(String s) => s.split(RegExp(r'[,;\s]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
+  static const _matrixOps = {'matrix_det', 'matrix_inverse', 'matrix_transpose', 'matrix_rank', 'matrix_rref', 'eigen'};
+  static const _symbolicMatrixOp = {'matrix_det': 'det', 'matrix_inverse': 'inverse', 'matrix_transpose': 'transpose', 'eigen': 'eigen'};
+
   Future<void> _calculate() async {
-    final text = _expr.text.trim();
-    if (text.isEmpty || _busy) return;
-    if (looksLikeNaturalLanguage(text) && _interpretation == null) {
+    if (_busy) return;
+    final b = _b;
+    b.ed.flushPending();
+    String text = _expr.text.trim();
+    Map<String, dynamic>? fromEditor;
+    if (!b.textSource && !b.ed.isEmpty) {
+      try {
+        final er = b.ed.toRequest();
+        text = er.expression;
+        if (er.operation != null) {
+          fromEditor = {'operation': er.operation, ...er.extra, if (er.params.isNotEmpty) 'params': er.params};
+        }
+      } on EditorError catch (e) {
+        setState(() => b.localError = e.message);
+        return;
+      }
+    }
+    if (text.isEmpty) return;
+    if (fromEditor == null && looksLikeNaturalLanguage(text) && _interpretation == null) {
       await _interpret(text);
       return;
     }
-    final op = _op;
+    var op = _op;
+    Map<String, dynamic> req;
+    if (fromEditor != null && fromEditor['operation'] == 'matrix') {
+      final m = (fromEditor['matrix'] as List).map((r) => (r as List).map((e) => e.toString()).toList()).toList();
+      final mop = _matrixOps.contains(_manualOp) ? _manualOp! : 'matrix_det';
+      final symbolic = m.expand((r) => r).any((e) => RegExp(r'[A-Za-z]').hasMatch(e.replaceAll(RegExp(r'\b(pi|e|sqrt)\b'), '')));
+      if (symbolic) {
+        final sop = _symbolicMatrixOp[mop];
+        if (sop == null) {
+          setState(() => b.localError = 'Con símbolos se puede calcular: determinante, inversa, transpuesta y autovalores.');
+          return;
+        }
+        op = 'matrix_symbolic';
+        req = {'operation': op, 'structured_input': {'a': m}, 'params': {'op': sop}};
+      } else {
+        op = mop;
+        req = {'operation': op, 'structured_input': {'a': m}};
+      }
+      req.addAll({'timeout_ms': 30000, 'latex': true, 'steps': true});
+      await _send(b, req, text, op);
+      return;
+    }
+    if (fromEditor != null) {
+      op = fromEditor['operation'] as String;
+      req = {...fromEditor, 'expression': text, 'timeout_ms': 30000, 'latex': true, 'steps': true};
+      if (_digits != 15) req['precision'] = _digits;
+      await _send(b, req, text, op);
+      return;
+    }
     final f = _spec.fields;
-    setState(() => _busy = true);
-    final req = <String, dynamic>{'operation': op, 'expression': text, 'timeout_ms': 30000, 'latex': true, 'steps': true};
+    req = <String, dynamic>{'operation': op, 'expression': text, 'timeout_ms': 30000, 'latex': true, 'steps': true};
     if ((f.contains(OpField.variable) || f.contains(OpField.variables)) && _var.text.trim().isNotEmpty) {
       req['variables'] = f.contains(OpField.variables) ? _list(_var.text) : [_var.text.trim()];
     }
@@ -120,6 +280,27 @@ class _CalculatorPageState extends State<CalculatorPage> {
       req['conditions'] = _conds.text.split(RegExp(r'[;\n]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
     if (_digits != 15) req['precision'] = _digits;
+    if (op == 'sum' || op == 'product') {
+      req['params'] = {'var': _var.text.trim().isEmpty ? 'k' : _var.text.trim(), 'from': _lower.text.trim().isEmpty ? '1' : _lower.text.trim(),
+        'to': _upper.text.trim().isEmpty ? 'n' : _upper.text.trim()};
+    }
+    if (op == 'substitute') {
+      final values = <String, String>{};
+      for (final part in _conds.text.split(RegExp(r'[;,\n]'))) {
+        final kv = part.split('=');
+        if (kv.length == 2 && kv[0].trim().isNotEmpty) values[kv[0].trim()] = kv[1].trim();
+      }
+      req['params'] = {'values': values};
+    }
+    if (op == 'logic' || op == 'sets') req['expression'] = text;
+    await _send(_b, req, text, op);
+  }
+
+  Future<void> _send(_Block b, Map<String, dynamic> req, String text, String op) async {
+    setState(() {
+      _busy = true;
+      b.localError = null;
+    });
     final r = await widget.engine.send(req);
     try {
       await widget.store.add(HistoryEntry(
@@ -134,8 +315,8 @@ class _CalculatorPageState extends State<CalculatorPage> {
     }
     if (!mounted) return;
     setState(() {
-      _resp = r;
-      _lastInput = text;
+      b.resp = r;
+      b.lastInput = text;
       _busy = false;
     });
   }
@@ -153,9 +334,8 @@ class _CalculatorPageState extends State<CalculatorPage> {
 
   void _acceptInterpretation() {
     final d = _interpretation!;
-    _expr.removeListener(_onText);
     setState(() {
-      _expr.text = d['expression']?.toString() ?? _expr.text;
+      _expr.text = d['expression']?.toString() ?? _expr.text; // _onText reconstruye el editor
       _manualOp = d['operation']?.toString();
       _category = opSpec(_manualOp ?? '')?.category ?? _category;
       final vars = d['variables'];
@@ -164,8 +344,6 @@ class _CalculatorPageState extends State<CalculatorPage> {
       if (d['direction'] != null) _direction = d['direction'].toString();
       _interpretation = null;
     });
-    _expr.addListener(_onText);
-    _updatePreview();
     _calculate();
   }
 
@@ -327,25 +505,92 @@ class _CalculatorPageState extends State<CalculatorPage> {
     );
   }
 
+  /// Bloques anteriores (o posteriores) de la hoja: entrada dibujada y resultado; al tocarlos se editan.
+  Widget _blockCard(BuildContext context, int i) {
+    final b = _blocks[i];
+    final t = Theme.of(context);
+    String? latex;
+    try {
+      latex = b.ed.isEmpty ? null : b.ed.root.toLatex();
+    } catch (_) {
+      latex = null;
+    }
+    return Card(
+      key: Key('bloque_$i'),
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      color: t.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: t.colorScheme.outlineVariant)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _activate(i),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CircleAvatar(radius: 12, child: Text('${i + 1}', style: const TextStyle(fontSize: 12))),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (latex != null) MathView(latex, fontSize: 18) else Text(b.text, style: const TextStyle(fontFamily: 'monospace')),
+                if (b.resp != null)
+                  Row(children: [
+                    Icon(b.resp!.hasResult ? Icons.arrow_right_alt : Icons.error_outline, size: 18, color: t.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                        child: b.resp!.latexResult != null
+                            ? MathView(b.resp!.latexResult, fallback: b.resp!.exactResult, fontSize: 18)
+                            : Text(b.resp!.exactResult ?? b.resp!.errorMessage ?? ResultView.statusText(b.resp!),
+                                maxLines: 2, overflow: TextOverflow.ellipsis)),
+                  ]),
+              ]),
+            ),
+            IconButton(
+                tooltip: 'Eliminar bloque',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _deleteBlock(i),
+                icon: const Icon(Icons.close, size: 18)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _workspace(BuildContext context, {required bool keypadInline}) {
     final theme = Theme.of(context);
     final interpreted = _spec.label;
-    final natural = looksLikeNaturalLanguage(_expr.text);
+    final natural = _b.textSource && looksLikeNaturalLanguage(_expr.text);
     return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+      for (var i = 0; i < _active; i++) _blockCard(context, i),
+      Row(children: [
+        CircleAvatar(radius: 12, backgroundColor: theme.colorScheme.primary, child: Text('${_active + 1}',
+            style: TextStyle(fontSize: 12, color: theme.colorScheme.onPrimary))),
+        const SizedBox(width: 8),
+        Text('Expresión ${_active + 1}', style: theme.textTheme.titleSmall),
+        const Spacer(),
+        TextButton.icon(
+            key: const Key('boton_nuevo_bloque'),
+            onPressed: _newBlock,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Nueva expresión')),
+      ]),
+      const SizedBox(height: 6),
+      MathEditor(key: Key('editor_$_active'), controller: _ed, focusNode: _editorFocus, onSubmit: _calculate),
+      const SizedBox(height: 8),
       CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.enter, control: true): _calculate},
         child: TextField(
           key: const Key('campo_expresion'),
           controller: _expr,
-          focusNode: _focus,
-          style: theme.textTheme.headlineSmall?.copyWith(fontFamily: 'monospace'),
+          style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'monospace'),
           textInputAction: TextInputAction.done,
           keyboardType: TextInputType.visiblePassword, // sin autocorreccion del teclado del sistema
           autocorrect: false,
           enableSuggestions: false,
           decoration: InputDecoration(
-            hintText: 'x^2-5*x+6=0   o   «deriva x al cubo por seno de x»',
-            labelText: 'Expresión o instrucción',
+            isDense: true,
+            prefixIcon: const Icon(Icons.short_text, size: 20),
+            hintText: 'o escriba aquí: x^2-5*x+6=0, «deriva x al cubo por seno de x»…',
+            labelText: 'Texto o instrucción en español',
             border: const OutlineInputBorder(),
             suffixIcon: _expr.text.isEmpty
                 ? null
@@ -354,13 +599,10 @@ class _CalculatorPageState extends State<CalculatorPage> {
           onSubmitted: (_) => _calculate(),
         ),
       ),
-      if (_preview != null)
-        Container(
-          key: const Key('vista_previa'),
-          margin: const EdgeInsets.only(top: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
-          child: MathView(_preview, fontSize: 22),
+      if (_b.localError != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(_b.localError!, key: const Key('error_editor'), style: TextStyle(color: theme.colorScheme.error)),
         ),
       if (_interpretation != null) Padding(padding: const EdgeInsets.only(top: 8), child: _interpretationCard(context)),
       const SizedBox(height: 10),
@@ -413,24 +655,25 @@ class _CalculatorPageState extends State<CalculatorPage> {
         ),
         if (!keypadInline)
           IconButton(
-            tooltip: _showKeypad ? 'Ocultar teclado científico' : 'Mostrar teclado científico',
-            onPressed: () => setState(() => _showKeypad = !_showKeypad),
-            icon: Icon(_showKeypad ? Icons.keyboard_hide : Icons.keyboard),
+            key: const Key('boton_teclado'),
+            tooltip: (_showKeyboard ?? true) ? 'Ocultar teclado matemático' : 'Mostrar teclado matemático',
+            onPressed: () => setState(() => _showKeyboard = !(_showKeyboard ?? true)),
+            icon: Icon((_showKeyboard ?? true) ? Icons.keyboard_hide : Icons.keyboard),
           ),
       ]),
       const SizedBox(height: 12),
-      if (_resp != null) ResultView(response: _resp!, input: _lastInput),
-      if (_resp == null)
-        _Examples(
-            onPick: (e, op) => setState(() {
-                  _expr.text = e;
-                  _manualOp = op;
-                  if (op != null) _category = opSpec(op)?.category ?? _category;
-                })),
-      if (!keypadInline && _showKeypad) ...[
-        const SizedBox(height: 16),
-        MathKeypad(controller: _expr, onSubmit: _calculate, focusNode: _focus),
-      ],
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: _resp != null
+            ? ResultView(key: ValueKey(_resp), response: _resp!, input: _lastInput)
+            : _Examples(
+                onPick: (e, op) => setState(() {
+                      _expr.text = e;
+                      _manualOp = op;
+                      if (op != null) _category = opSpec(op)?.category ?? _category;
+                    })),
+      ),
+      for (var i = _active + 1; i < _blocks.length; i++) Padding(padding: const EdgeInsets.only(top: 8), child: _blockCard(context, i)),
     ]);
   }
 
@@ -438,14 +681,18 @@ class _CalculatorPageState extends State<CalculatorPage> {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, box) {
       final wide = box.maxWidth >= 900;
-      if (!wide) return _workspace(context, keypadInline: false);
+      if (!wide) {
+        return Column(children: [
+          Expanded(child: _workspace(context, keypadInline: false)),
+          if (_showKeyboard ?? true) MathKeyboard(key: const Key('teclado_matematico'), controller: _ed, host: this),
+        ]);
+      }
       return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(child: _workspace(context, keypadInline: true)),
         const VerticalDivider(width: 1),
         SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16), child: MathKeypad(controller: _expr, onSubmit: _calculate, focusNode: _focus)),
+          width: 480,
+          child: SingleChildScrollView(child: MathKeyboard(key: const Key('teclado_matematico'), controller: _ed, host: this)),
         ),
       ]);
     });

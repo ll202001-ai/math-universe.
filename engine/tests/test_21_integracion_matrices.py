@@ -39,7 +39,7 @@ def test_toda_respuesta_cumple_el_esquema_y_viene_verificada(op):
     b = {"matrix_solve": [[1], [0]]}.get(op, [[1, 0], [0, 1]])
     r = M(op, [[2, 1], [1, 3]], b if op in ("matrix_add", "matrix_sub", "matrix_mul", "matrix_solve") else None, request_id=7)
     jsonschema.validate(r, RESPONSE_SCHEMA)
-    assert r["api_version"] == "1.2" == API_VERSION and r["request_id"] == 7
+    assert r["api_version"] == "1.3" == API_VERSION and r["request_id"] == 7
     assert r["status"] in ("success_exact", "multiple_solutions"), r
     assert r["verification"]["status"] == "passed" and r["verification"]["method"]
 
@@ -114,7 +114,7 @@ def test_h1_no_rompe_notacion_cientifica_normal():
 # ---- contrato y compatibilidad ----
 def test_capabilities_y_esquema():
     c = capabilities()
-    assert c["engine_version"] == "0.6.0" and c["api_version"] == "1.2" and c["modules"]["matrices_algebra_lineal"].startswith("estable")
+    assert c["engine_version"] == "0.7.0" and c["api_version"] == "1.3" and c["modules"]["matrices_algebra_lineal"].startswith("estable")
     assert set(MATRIX_OPS) <= set(REQUEST_SCHEMA["properties"]["operation"]["enum"])
 
 

@@ -10,7 +10,7 @@ except ImportError:  # pragma: no cover
     sp = None
 
 
-SYMBOLIC_OPS = {"simplify", "expand", "factor", "differentiate", "integrate"}
+SYMBOLIC_OPS = {"simplify", "expand", "factor", "differentiate", "integrate", "evaluate"}
 
 
 def available():
@@ -28,6 +28,7 @@ def from_sympy_text(t):
     t = re.sub(r"\blog\(", "ln(", t)
     t = re.sub(r"\bE\b", "e", t)
     t = re.sub(r"\bI\b", "i", t)
+    t = re.sub(r"\bceiling\(", "ceil(", t)
     return t.replace("**", "^")
 
 
@@ -45,7 +46,12 @@ def _funcs():
         _FUNCS.update({"sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "exp": sp.exp,
                        "ln": sp.log, "log": sp.log, "sqrt": sp.sqrt, "abs": sp.Abs,
                        "asin": sp.asin, "acos": sp.acos, "atan": sp.atan,
-                       "sinh": sp.sinh, "cosh": sp.cosh, "tanh": sp.tanh})
+                       "sinh": sp.sinh, "cosh": sp.cosh, "tanh": sp.tanh,
+                       # 0.7.0
+                       "sec": sp.sec, "csc": sp.csc, "cot": sp.cot, "asinh": sp.asinh, "acosh": sp.acosh,
+                       "atanh": sp.atanh, "cbrt": lambda v: sp.real_root(v, 3), "gamma": sp.gamma, "erf": sp.erf,
+                       "erfc": sp.erfc, "beta": sp.beta, "zeta": sp.zeta, "besselj": sp.besselj,
+                       "floor": sp.floor, "ceil": sp.ceiling, "root": lambda v, n: sp.real_root(v, n) if n.is_odd else sp.root(v, n)})
     return _FUNCS
 
 
@@ -67,6 +73,8 @@ def to_sympy(node):
         a, b = to_sympy(node[2]), to_sympy(node[3])
         return {"+": a + b, "-": a - b, "*": a * b, "/": a / b, "^": a ** b}[node[1]]
     if k == "call":
+        if node[1] in ("log", "ln") and len(node[2]) == 2:
+            return sp.log(to_sympy(node[2][0]), to_sympy(node[2][1]))
         fn = _funcs().get(node[1])
         if fn is None:
             raise NotImplementedOperation(f"Función '{node[1]}' no reconocida")
@@ -88,6 +96,12 @@ def _var(expr, variables):
 def run(operation, ast, variables):
     _need()
     expr = to_sympy(ast)
+    if operation == "evaluate":
+        r = sp.simplify(expr)
+        if r.has(sp.zoo, sp.nan) or r in (sp.oo, -sp.oo):
+            from .errors import MathDomainError
+            raise MathDomainError("La expresión no está definida (división por cero o argumento fuera del dominio)")
+        return from_sympy_text(str(r))
     if operation == "simplify": return from_sympy_text(str(sp.simplify(expr)))
     if operation == "expand": return from_sympy_text(str(sp.expand(expr)))
     if operation == "factor": return from_sympy_text(str(sp.factor(expr)))

@@ -1,4 +1,4 @@
-# Lo que el motor NO soporta o resuelve de forma incompleta (motor 0.6.0)
+# Lo que el motor NO soporta o resuelve de forma incompleta (motor 0.7.0)
 
 **Este archivo se genera ejecutando `audit/no_soportado.py` (`python tools/generar_no_soportado.py`).** Cada fila es un caso real ejecutado;
 una prueba (`tests/test_12_no_soportado.py`) falla si el comportamiento cambia sin actualizar este documento.

@@ -66,3 +66,33 @@ Las ADR-1 a ADR-3 están en `CONTRATO.md` (motor propio + respaldo SymPy verific
 ## ADR-14 · Lenguaje natural por reglas, no por IA (por ahora)
 - «deriva x al cubo por seno de x» → operación + expresión; la app muestra «Entendí: …» y solo calcula al confirmar.
   Una IA en línea requeriría proveedor, clave y consentimiento de envío de datos; queda como servicio opcional futuro.
+
+## ADR-15 · Editor matemático estructurado nativo en Flutter (0.7.0)
+- La entrada pasa a ser un árbol (`app/lib/editor/math_node.dart`): filas de nodos con ranuras editables (fracción
+  numerador/denominador, potencia, subíndice, raíz e índice, |x|, ⌊x⌋, ⌈x⌉, funciones, log en base b, integral con
+  límites, Σ, Π, límite, d/dx, matrices m×n y sistemas). Un cursor (ruta dentro del árbol) se mueve con ← → ↑ ↓ y Tab
+  (siguiente casilla vacía); deshacer/rehacer con instantáneas (máx. 200).
+- Se dibuja con `flutter_math_fork` (LaTeX con `\square` en casillas vacías y una barra de cursor coloreada) y se
+  serializa al texto del contrato del motor (`toEngine`). Las plantillas de cálculo del nivel superior (integral, Σ, Π,
+  lím, d/dx, matriz, sistema) se convierten en la OPERACIÓN y parámetros correspondientes del contrato (`toRequest`).
+- **Alternativa descartada: MathLive en un WebView.** Requiere WebView2 en Windows y otro WebView en Android, dos pilas de
+  interfaz, un puente JavaScript y no se puede probar con las pruebas de widgets de Flutter. El editor nativo funciona
+  igual en ambas plataformas, sin red, y cada botón tiene prueba automática.
+- Lo que no se puede enviar al motor no se simula: una casilla vacía o una integral/Σ anidada dentro de otra expresión
+  muestran un mensaje claro («Complete el denominador…», «La integral debe ser la expresión completa…»).
+- Teclado de 10 pestañas (`keyboard_layout.dart`): Básico, Álgebra, Cálculo, Trigonometría, Matrices y vectores,
+  Estadística, Ecuaciones, Griegas, Lógica y conjuntos, Funciones especiales; fila fija de control (← → ↑ ↓, siguiente,
+  deshacer, rehacer, borrar, AC) y de acciones (Simplificar, Expandir, Factorizar, Resolver, =).
+- Teclado físico: `/` convierte el término anterior en numerador, `^` exponente, `_` subíndice, `|` valor absoluto,
+  palabras (`sin`, `sqrt`, `pi`, `alpha`…) se convierten en función/símbolo; Ctrl+Z/Y, Ctrl+C/V, Enter = calcular.
+- Hoja de trabajo: varias expresiones en bloques con su resultado; tocar un bloque lo reabre para editarlo y recalcular.
+  La línea de texto sigue disponible y se sincroniza en ambos sentidos con el editor (pegar texto → estructura).
+
+## ADR-16 · Motor 0.7.0 (contrato 1.3, aditivo)
+- Nuevas operaciones en `advanced2.py`, todas con SymPy y una comprobación independiente: `sum`/`product` (suma
+  directa de términos o sumas parciales con mpmath para series), `substitute` (evaluador propio en puntos),
+  `matrix_symbolic` (A·A⁻¹ = I simplificado, det por dos métodos, evaluación en puntos racionales), `logic` (tabla de
+  verdad completa con un parser propio), `sets` (pertenencia en puntos de prueba) e `implicit_diff`.
+- Funciones nuevas: `%`, `log(x,b)`, `cbrt`, `root`, sec/csc/cot, asinh/acosh/atanh, gamma, erf, erfc, beta, zeta,
+  besselj, floor, ceil. `evaluate` tiene respaldo SymPy verificado; un resultado `zoo`/`nan` es error de dominio, nunca un
+  «resultado».

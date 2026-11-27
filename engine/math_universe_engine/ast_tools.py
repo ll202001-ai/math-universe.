@@ -145,6 +145,12 @@ def _as_frac(q):
     return q.a
 
 
+def _zeta(v):
+    import mpmath
+    if v == 1: raise MathDomainError("zeta(1) no está definida")
+    return float(mpmath.zeta(v))
+
+
 def eval_float(n, env):
     """Evaluación numérica en coma flotante (reales). Lanza ValueError/MathDomainError en puntos inválidos."""
     k = n[0]
@@ -171,11 +177,30 @@ def eval_float(n, env):
             return r
     if k == "call":
         a = [eval_float(x, env) for x in n[2]]
+        if n[1] in ("log", "ln") and len(a) == 2:                  # 0.7.0: log(x, b) = logaritmo en base b
+            if a[0] <= 0 or a[1] <= 0 or a[1] == 1: raise MathDomainError("Logaritmo fuera de su dominio")
+            return math.log(a[0]) / math.log(a[1])
+        if n[1] == "root" and len(a) == 2:
+            if a[1] == 0: raise MathDomainError("Raíz de índice cero")
+            if a[0] < 0 and float(a[1]).is_integer() and int(a[1]) % 2 == 1: return -((-a[0]) ** (1 / a[1]))
+            return a[0] ** (1 / a[1])
+        if n[1] == "beta" and len(a) == 2:
+            return math.gamma(a[0]) * math.gamma(a[1]) / math.gamma(a[0] + a[1])
+        if n[1] == "besselj" and len(a) == 2:
+            import mpmath
+            return float(mpmath.besselj(a[0], a[1]))
         f = {"sin": math.sin, "cos": math.cos, "tan": math.tan, "exp": math.exp, "ln": math.log, "log": math.log,
              "sqrt": math.sqrt, "abs": abs, "asin": math.asin, "acos": math.acos, "atan": math.atan,
-             "sinh": math.sinh, "cosh": math.cosh, "tanh": math.tanh}.get(n[1])
+             "sinh": math.sinh, "cosh": math.cosh, "tanh": math.tanh,
+             "sec": lambda v: 1 / math.cos(v), "csc": lambda v: 1 / math.sin(v), "cot": lambda v: math.cos(v) / math.sin(v),
+             "asinh": math.asinh, "acosh": math.acosh, "atanh": math.atanh, "cbrt": lambda v: math.copysign(abs(v) ** (1 / 3), v),
+             "gamma": math.gamma, "erf": math.erf, "erfc": math.erfc, "floor": math.floor, "ceil": math.ceil,
+             "zeta": _zeta}.get(n[1])
         if f is None or len(a) != 1: raise NotImplementedOperation(f"Función '{n[1]}' no soportada")
-        return f(a[0])
+        try:
+            return f(a[0])
+        except (ValueError, ZeroDivisionError, OverflowError):
+            raise MathDomainError(f"'{n[1]}' fuera de su dominio")
     raise ParseError("Nodo desconocido")
 
 
