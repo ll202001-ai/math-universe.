@@ -79,6 +79,7 @@ def _newton(Fn, Jn, x0, it=80):
             return None
         dx = _solve_lin(J, fv)
         if dx is None: return None
+        if max(abs(d) for d in dx) <= 1e-13 * (1 + max(abs(v) for v in x)): return x   # converge (ruido de redondeo)
         # amortiguación simple
         t = 1.0
         for _ in range(30):
@@ -91,7 +92,7 @@ def _newton(Fn, Jn, x0, it=80):
                 pass
             t /= 2
         else:
-            return None
+            return x if nf < 1e-9 else None
         x = xn
         if max(abs(t * d) for d in dx) > 1e8: return None
     try:
@@ -149,10 +150,12 @@ def compile_matrix(M, vars_):
 # ------------------------------------------------------------------ evaluación exacta en un punto
 def _eval_exacto(ast, vars_, punto):
     """ast evaluado en el punto (Fractions/GP): Expr exacto si es posible, si no float"""
+    if any(isinstance(c, float) for c in punto):   # punto no exacto: valor decimal (no se inventan fracciones enormes)
+        return compile_ast(ast, list(vars_))(*[_valor_gp(c) for c in punto])
     try:
         e = from_ast(ast)
         for v, c in zip(vars_, punto):
-            e = e.subs(v, Expr.of(c if isinstance(c, GP) else GP.const(c)) if not isinstance(c, float) else Expr.of(GP.const(F(c).limit_denominator(10 ** 9))))
+            e = e.subs(v, Expr.of(c if isinstance(c, GP) else GP.const(c)))
         return e
     except Exception:
         env = {v: _valor_gp(c) for v, c in zip(vars_, punto)}

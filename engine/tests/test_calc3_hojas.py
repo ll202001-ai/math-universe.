@@ -80,3 +80,30 @@ def test_hoja19_ej6_suma_de_dos_piezas():
     a = call(T(tipo="triple_region", f="1", z_inf="0", z_sup="3", curvas=["y=x", "y=2*x", "y=1"], orden="dydx", punto=[0.5, 0.8]))
     b = call(T(tipo="triple_region", f="1", z_inf="0", z_sup="4-y^2", curvas=["y=x", "y=2*x", "y=1", "y=2"], orden="dydx", punto=[1, 1.5]))
     assert a["exact_result"] == "3/4" and b["exact_result"] == "9/8"  # suma 15/8
+
+
+# ---- Hoja #16 (optimización) ----
+def _fnum(r, i=0):
+    return float(re.findall(r"f = (-?\d+\.?\d*)", r["exact_result"])[i])
+
+
+def test_hoja16_ingreso_y_cafe():
+    r = call(T(tipo="extremos", f="-5*x1^2-8*x2^2-2*x1*x2+42*x1+102*x2", variables=["x1", "x2"]))
+    assert "P1(3, 6)" in r["exact_result"] and "máximo" in r["exact_result"]
+    r = call(T(tipo="extremos", f="(x-6)*(300-100*x+70*y)+(y-8)*(250+80*x-75*y)", variables=["x", "y"]))
+    assert "P1(69/5, 50/3)" in r["exact_result"]  # 13.80 y 16.67
+
+
+def test_hoja16_lagrange():
+    r = call(T(tipo="lagrange", f="100*x^(3/4)*y^(1/4)", restricciones=["150*x+250*y=50000"], variables=["x", "y"], positivo=True))
+    assert "P1(250, 50)" in r["exact_result"] and _fnum(r) == pytest.approx(16718.5, abs=0.1)
+    r = call(T(tipo="lagrange", f="3*x^2+200+y^2+400+2*z^2+300", restricciones=["x+y+z=1100"], variables=["x", "y", "z"]))
+    assert "P1(200, 600, 300)" in r["exact_result"]
+    r = call(T(tipo="lagrange", f="x*y*z", restricciones=["x+2*y+3*z=6"], variables=["x", "y", "z"], positivo=True))
+    assert "P1(2, 1, 2/3)" in r["exact_result"] and "4/3" in r["exact_result"]
+    r = call(T(tipo="lagrange", f="(x-2)^2+(y-2)^2+(z-2)^2", restricciones=["z=x^2+y^2+2"], variables=["x", "y", "z"]))
+    assert math.sqrt(_fnum(r)) == pytest.approx(2.0830, abs=1e-3)
+    r = call(T(tipo="lagrange", f="(x-t)^2+(y-t)^2+(z-2-t)^2", restricciones=["z^2-9*x^2-9*y^2=9"], variables=["x", "y", "z", "t"]))
+    assert math.sqrt(_fnum(r, 1)) == pytest.approx(0.7474, abs=1e-3)
+    r = call(T(tipo="lagrange", f="x^2+y^2+z^2", restricciones=["x+y+z=1", "x^2+y^2=1"], variables=["x", "y", "z"]))
+    assert "P1(-√2/2, -√2/2" in r["exact_result"] and "P2(0, 1, 0)" in r["exact_result"]
