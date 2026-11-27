@@ -54,7 +54,7 @@ def _fin(res, metodo):
 def run(req, st):
     p = dict(req.get("params") or {})
     tipo = p.get("tipo")
-    if tipo not in TIPOS: raise InvalidRequest("params.tipo debe ser uno de: " + ", ".join(TIPOS))
+    if tipo != "suma" and tipo not in TIPOS: raise InvalidRequest("params.tipo debe ser uno de: " + ", ".join(TIPOS))
     try:
         return _run(tipo, p, req, st)
     except NoSoportado as e:
@@ -63,7 +63,33 @@ def run(req, st):
         raise MathDomainError("Operación fuera de dominio: " + str(e))
 
 
+def _suma(p, req, st):
+    """Suma de varias integrales/piezas (p. ej. regiones que se parten en dos): cada parte es una solicitud calc3 completa"""
+    partes = _req(p, "partes")
+    if len(partes) < 2: raise InvalidRequest("Se necesitan al menos dos partes")
+    total = None; aprox = 0.0; pasos = []; todas_ok = True
+    for i, q in enumerate(partes, 1):
+        q = dict(q)
+        if q.get("tipo") in (None, "suma"): raise InvalidRequest("Cada parte debe tener un tipo de ejercicio (no «suma»)")
+        r = _run(q["tipo"], q, req, st)
+        ex = r.get("exact_result")
+        if r.get("status") != "success_exact" or ex is None or "=" in str(ex):
+            raise InvalidRequest(f"La parte {i} no da un único valor exacto; no se puede sumar")
+        e = _P(str(ex)); total = e if total is None else total + e
+        aprox += float(str(r["approximate_result"]).split()[0])
+        todas_ok = todas_ok and r.get("verification", {}).get("status") == "passed"
+        pasos.append({"text": f"Parte {i}: resultado {ex}"})
+        pasos.extend(dict(x, text=f"[parte {i}] " + x["text"]) for x in r.get("steps", []))
+    pasos.append({"text": "Resultado total = suma de las partes", "latex": total.to_str(True)})
+    return {"status": "success_exact", "exact_result": total.to_str(), "approximate_result": _fmt_num(aprox), "method": "suma_de_integrales",
+            "latex": {"result": total.to_str(True)},
+            "verification": {"status": "passed" if todas_ok else "not_possible", "method": "cuadratura numérica independiente de cada parte"},
+            "steps": pasos, "data": {"partes": len(partes)}}
+
+
 def _run(tipo, p, req, st):
+    if tipo == "suma":
+        return _suma(p, req, st)
     if tipo == "iterada":
         f = _P(_req(p, "f")); niv = _niveles(_req(p, "niveles"))
         return _fin(integrar(f, niv, nombre="I"), "integral_iterada_exacta")

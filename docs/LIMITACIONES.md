@@ -67,5 +67,7 @@ Límites conocidos:
 - Regiones con varias caras acotadas: el motor avisa y pide un punto interior («punto») para elegir.
 - Discrepancias con respuestas impresas en las hojas (verificadas por dos órdenes de integración y cuadratura):
   #17.8 (−4.6809 frente a ≈−3.4116), #20.9 (centro de masa ×√2), #15.23 (el punto impreso viola las restricciones).
-  #17.18 (V≈11.9587) no se reprodujo: enunciado ambiguo.
+  #17.18 (V≈11.9587): con la lectura estándar (cilindro x²+z²=4, z≥0, plano x+y=5) el motor da 10π ≈ 31.416, igual que el ejemplo
+  análogo de libro (Sullivan, cilindro y²+z²=4 con plano x+z=5); el valor impreso no corresponde a ninguna lectura probada.
 - Pantalla «Mat. III»: parámetros_extremo y parámetros_condicion existen en el motor pero aún no tienen formulario.
+- Operación `suma` (varias piezas, cada una una solicitud calc3 con resultado exacto único): usada para sólidos cuya tapa cambia (#19.6).

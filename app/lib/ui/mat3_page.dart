@@ -157,6 +157,50 @@ final List<_Tipo> _tipos = [
         'modo': v['modo'],
         'orden': v['orden'],
       }, v)),
+  _Tipo('cambio3d', 'Cambio de variables en integral triple', 'Transformación directa x=x(r,t,z)… o inversa; límites en las variables nuevas (de la interna a la externa). Ej.: elipsoide con x=3r·cos(t), y=2r·sin(t).', const [
+    _Campo('f', 'Integrando f(x,y,z)', hint: 'z*(x^2+y^2)'),
+    _Campo('viejas', 'Variables originales', def: 'x, y, z'),
+    _Campo('nuevas', 'Variables nuevas', def: 'r, t, z'),
+    _Campo('mapa', 'Transformación (una por línea)', lines: 3, hint: 'x = 3*r*cos(t)\ny = 2*r*sin(t)\nz = z'),
+    _Campo('modo', 'Modo', opciones: ['directo', 'inverso']),
+    _Campo('niveles', 'Niveles (uno por línea, el primero es el interno)', lines: 3, hint: 'z, 0, 36*(1-r^2)\nr, 0, 1\nt, 0, 2*pi'),
+  ], (v) => {
+        'tipo': 'cambio_variables_3d',
+        'f': v['f'],
+        'viejas': _csv(v['viejas']!),
+        'nuevas': _csv(v['nuevas']!),
+        'mapa': _mapa(v['mapa']!),
+        'modo': v['modo'],
+        'niveles': _triples(v['niveles']!),
+      }),
+  _Tipo('dos_piezas', 'Sólido en dos piezas (suma de dos triples)', 'Cuando la superficie superior cambia (p. ej. z = 3 y z = 4 − y²). Cada pieza lleva su región y un punto interior.', const [
+    _Campo('f', 'Integrando (1 = volumen)', def: '1'),
+    _Campo('z_inf_a', 'Pieza 1: z inferior', def: '0'),
+    _Campo('z_sup_a', 'Pieza 1: z superior', hint: '3'),
+    _Campo('curvas_a', 'Pieza 1: curvas (una por línea)', lines: 3, hint: 'y=x\ny=2*x\ny=1'),
+    _Campo('punto_a', 'Pieza 1: punto interior', hint: '0.5, 0.8'),
+    _Campo('z_inf_b', 'Pieza 2: z inferior', def: '0'),
+    _Campo('z_sup_b', 'Pieza 2: z superior', hint: '4-y^2'),
+    _Campo('curvas_b', 'Pieza 2: curvas (una por línea)', lines: 4, hint: 'y=x\ny=2*x\ny=1\ny=2'),
+    _Campo('punto_b', 'Pieza 2: punto interior', hint: '1, 1.5'),
+    _cOrden,
+  ], (v) {
+    Map<String, dynamic> pieza(String s) {
+      final p = <String, dynamic>{
+        'tipo': 'triple_region',
+        'f': v['f'],
+        'z_inf': v['z_inf_$s'],
+        'z_sup': v['z_sup_$s'],
+        'curvas': _lineas(v['curvas_$s']!),
+        'orden': v['orden'],
+      };
+      final pt = _csv(v['punto_$s'] ?? '');
+      if (pt.length == 2) p['punto'] = pt;
+      return p;
+    }
+
+    return {'tipo': 'suma', 'partes': [pieza('a'), pieza('b')]};
+  }),
   _Tipo('extremos', 'Extremos locales (Hessiano)', 'Puntos críticos y clasificación con el criterio de Sylvester.', const [
     _Campo('f', 'f', hint: 'x^3+y^3-3*x*y'),
     _Campo('variables', 'Variables', def: 'x, y'),

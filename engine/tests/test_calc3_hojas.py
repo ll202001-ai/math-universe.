@@ -107,3 +107,17 @@ def test_hoja16_lagrange():
     assert math.sqrt(_fnum(r, 1)) == pytest.approx(0.7474, abs=1e-3)
     r = call(T(tipo="lagrange", f="x^2+y^2+z^2", restricciones=["x+y+z=1", "x^2+y^2=1"], variables=["x", "y", "z"]))
     assert "P1(-√2/2, -√2/2" in r["exact_result"] and "P2(0, 1, 0)" in r["exact_result"]
+
+
+def test_suma_de_piezas_hoja19_ej6():
+    r = call(T(tipo="suma", partes=[
+        T(tipo="triple_region", f="1", z_inf="0", z_sup="3", curvas=["y=x", "y=2*x", "y=1"], orden="dydx", punto=[0.5, 0.8]),
+        T(tipo="triple_region", f="1", z_inf="0", z_sup="4-y^2", curvas=["y=x", "y=2*x", "y=1", "y=2"], orden="dydx", punto=[1, 1.5])]))
+    assert r["exact_result"] == "15/8" and r["verification"]["status"] == "passed"
+
+
+def test_hoja17_ej18_semidisco_10pi():
+    """x²+z²=4, x+y=5, y=z=0: V = ∬(5−x) dA sobre el semidisco z≥0 = 10π (mismo planteo que el ejemplo de Sullivan).
+    La hoja imprime ≈11.9587, que no corresponde a esta lectura (ver LIMITACIONES)."""
+    r = call(T(tipo="region", que="volumen", z="5-x", curvas=["x^2+y^2=4", "y=0"], orden="dydx", punto=[0, 1]))
+    assert float(re.search(r"\d+\.\d+", r["approximate_result"]).group()) == pytest.approx(10 * math.pi, rel=1e-6)
