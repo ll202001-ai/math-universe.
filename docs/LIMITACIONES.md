@@ -54,3 +54,18 @@ gráficas 2D/paramétricas/polares/3D, LaTeX de entrada y resultado.
   seguir ocupado hasta terminar (en Windows el proceso del motor se reinicia).
 - El historial se guarda localmente; todavía no hay favoritos, exportación ni sincronización.
 - Tema y tamaño de texto se ajustan en el menú, pero no se recuerdan entre sesiones.
+
+## Matemática III (operación `calc3`)
+
+Cubre integrales iteradas, dobles y triples (regiones por curvas, polares, cilíndricas, esféricas), masa, centro de masa e inercia,
+Jacobianos, cambio de variables, extremos, Lagrange y mínimos cuadrados. Cada resultado se contrasta con una integración numérica
+independiente (tanh-sinh anidada); si no coincide, se rechaza.
+
+Límites conocidos:
+- Solo integra con las reglas del curso (polinomios, exp, ln, sen/cos, potencias de lineales, sustitución simple). Si no hay primitiva
+  con esas reglas, entrega el valor numérico verificado y lo avisa.
+- Regiones con varias caras acotadas: el motor avisa y pide un punto interior («punto») para elegir.
+- Discrepancias con respuestas impresas en las hojas (verificadas por dos órdenes de integración y cuadratura):
+  #17.8 (−4.6809 frente a ≈−3.4116), #20.9 (centro de masa ×√2), #15.23 (el punto impreso viola las restricciones).
+  #17.18 (V≈11.9587) no se reprodujo: enunciado ambiguo.
+- Pantalla «Mat. III»: parámetros_extremo y parámetros_condicion existen en el motor pero aún no tienen formulario.
