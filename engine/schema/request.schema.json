@@ -1,221 +1,222 @@
 {
- "$schema": "https://json-schema.org/draft/2020-12/schema",
- "title": "MathUniverseRequest v1.3",
- "type": "object",
- "required": [
-  "operation"
- ],
- "additionalProperties": false,
- "properties": {
-  "request_id": {
-   "type": [
-    "string",
-    "integer",
-    "null"
-   ]
-  },
-  "operation": {
-   "type": "string",
-   "enum": [
-    "ping",
-    "capabilities",
-    "parse",
-    "evaluate",
-    "simplify",
-    "expand",
-    "factor",
-    "solve",
-    "differentiate",
-    "integrate",
-    "limit",
-    "determinant",
-    "matrix_add",
-    "matrix_sub",
-    "matrix_mul",
-    "matrix_transpose",
-    "matrix_det",
-    "matrix_inverse",
-    "matrix_rank",
-    "matrix_rref",
-    "matrix_solve",
-    "eigen",
-    "partial",
-    "gradient",
-    "hessian",
-    "jacobian",
-    "series",
-    "inequality",
-    "complex",
-    "ode",
-    "laplace",
-    "inverse_laplace",
-    "stats",
-    "units",
-    "formula",
-    "formulas",
-    "plot",
-    "plot3d",
-    "parametric",
-    "polar",
-    "interpret",
-    "sum",
-    "product",
-    "substitute",
-    "matrix_symbolic",
-    "logic",
-    "sets",
-    "implicit_diff"
-   ]
-  },
-  "expression": {
-   "type": "string",
-   "maxLength": 5000
-  },
-  "structured_input": {
-   "type": "object",
-   "additionalProperties": false,
-   "properties": {
-    "a": {
-     "oneOf": [
-      {
-       "type": "string",
-       "maxLength": 20000
-      },
-      {
-       "type": "array",
-       "maxItems": 40,
-       "items": {
-        "oneOf": [
-         {
-          "type": "array",
-          "maxItems": 40,
-          "items": {
-           "type": [
-            "string",
-            "number"
-           ]
-          }
-         },
-         {
-          "type": [
-           "string",
-           "number"
-          ]
-         }
-        ]
-       }
-      }
-     ]
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MathUniverseRequest v1.3",
+  "type": "object",
+  "required": [
+    "operation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": [
+        "string",
+        "integer",
+        "null"
+      ]
     },
-    "b": {
-     "oneOf": [
-      {
-       "type": "string",
-       "maxLength": 20000
-      },
-      {
-       "type": "array",
-       "maxItems": 40,
-       "items": {
-        "oneOf": [
-         {
-          "type": "array",
-          "maxItems": 40,
-          "items": {
-           "type": [
-            "string",
-            "number"
-           ]
-          }
-         },
-         {
-          "type": [
-           "string",
-           "number"
+    "operation": {
+      "type": "string",
+      "enum": [
+        "ping",
+        "capabilities",
+        "parse",
+        "evaluate",
+        "simplify",
+        "expand",
+        "factor",
+        "solve",
+        "differentiate",
+        "integrate",
+        "limit",
+        "determinant",
+        "matrix_add",
+        "matrix_sub",
+        "matrix_mul",
+        "matrix_transpose",
+        "matrix_det",
+        "matrix_inverse",
+        "matrix_rank",
+        "matrix_rref",
+        "matrix_solve",
+        "eigen",
+        "partial",
+        "gradient",
+        "hessian",
+        "jacobian",
+        "series",
+        "inequality",
+        "complex",
+        "ode",
+        "laplace",
+        "inverse_laplace",
+        "stats",
+        "units",
+        "formula",
+        "formulas",
+        "plot",
+        "plot3d",
+        "parametric",
+        "polar",
+        "interpret",
+        "sum",
+        "product",
+        "substitute",
+        "matrix_symbolic",
+        "logic",
+        "sets",
+        "implicit_diff",
+        "calc3"
+      ]
+    },
+    "expression": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "structured_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 20000
+            },
+            {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  }
+                ]
+              }
+            }
           ]
-         }
-        ]
-       }
+        },
+        "b": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 20000
+            },
+            {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
       }
-     ]
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"
+      },
+      "maxItems": 20
+    },
+    "assumptions": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "real",
+          "positive",
+          "negative",
+          "nonzero",
+          "integer",
+          "complex"
+        ]
+      }
+    },
+    "precision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 600000
+    },
+    "engine_version": {
+      "type": "string"
+    },
+    "point": {
+      "type": "string",
+      "maxLength": 50
+    },
+    "direction": {
+      "enum": [
+        "both",
+        "+",
+        "-"
+      ]
+    },
+    "lower": {
+      "type": "string",
+      "maxLength": 50
+    },
+    "upper": {
+      "type": "string",
+      "maxLength": 50
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "params": {
+      "type": "object",
+      "maxProperties": 40
+    },
+    "conditions": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      }
+    },
+    "latex": {
+      "type": "boolean"
+    },
+    "steps": {
+      "type": "boolean"
     }
-   }
-  },
-  "variables": {
-   "type": "array",
-   "items": {
-    "type": "string",
-    "pattern": "^[A-Za-z_][A-Za-z_0-9]*$"
-   },
-   "maxItems": 20
-  },
-  "assumptions": {
-   "type": "object",
-   "additionalProperties": {
-    "enum": [
-     "real",
-     "positive",
-     "negative",
-     "nonzero",
-     "integer",
-     "complex"
-    ]
-   }
-  },
-  "precision": {
-   "type": "integer",
-   "minimum": 1,
-   "maximum": 1000
-  },
-  "timeout_ms": {
-   "type": "integer",
-   "minimum": 1,
-   "maximum": 600000
-  },
-  "engine_version": {
-   "type": "string"
-  },
-  "point": {
-   "type": "string",
-   "maxLength": 50
-  },
-  "direction": {
-   "enum": [
-    "both",
-    "+",
-    "-"
-   ]
-  },
-  "lower": {
-   "type": "string",
-   "maxLength": 50
-  },
-  "upper": {
-   "type": "string",
-   "maxLength": 50
-  },
-  "order": {
-   "type": "integer",
-   "minimum": 1,
-   "maximum": 20
-  },
-  "params": {
-   "type": "object",
-   "maxProperties": 40
-  },
-  "conditions": {
-   "type": "array",
-   "maxItems": 10,
-   "items": {
-    "type": "string",
-    "maxLength": 200
-   }
-  },
-  "latex": {
-   "type": "boolean"
-  },
-  "steps": {
-   "type": "boolean"
   }
- }
 }

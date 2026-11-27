@@ -7,6 +7,7 @@ import time
 from fractions import Fraction
 from . import __version__, symbolic, limits, calculus, numeric_mp, solve as S
 from . import advanced, advanced2, plot as P, presentation, steps as STEPS, interpret as NL
+from .calc3 import api3 as CALC3
 from .arith import evaluate as arith_eval, format_fraction, to_decimal
 from .ast_tools import normalize, to_str, free_symbols, eval_float, eval_q, const_value
 from .errors import *
@@ -573,6 +574,10 @@ def _dispatch(req, st):
     if op == "capabilities": return {"data": capabilities()}
     if op == "determinant" or op in MATRIX_OPS:
         return op_matrix(req, st)
+    if op == "calc3":
+        remaining = max(30.0, limits._deadline - time.perf_counter()) if limits._deadline else 60
+        out = limits.run_in_thread(CALC3.run, (req, st), remaining)
+        return out
     if op == "formulas": return {"data": {"formulas": advanced.formulas_catalog()}}
     if op == "interpret": return {"data": NL.interpret(req.get("expression") or "")}
     if op in advanced.ADVANCED_OPS or op in advanced2.ADVANCED2_OPS:
